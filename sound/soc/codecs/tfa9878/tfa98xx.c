@@ -180,17 +180,17 @@ static inline char *_tfa_cont_profile_name
 		tfa98xx->tfa->dev_idx, prof_idx);
 }
 
-static enum tfa_error tfa98xx_write_re25(struct tfa_device *tfa, int value)
+static enum tfa98xx_error tfa98xx_write_re25(struct tfa_device *tfa, int value)
 {
-	enum tfa_error err;
+	enum tfa98xx_error err;
 
 	/* clear MTPEX */
 	err = tfa_dev_mtp_set(tfa, TFA_MTP_EX, 0);
-	if (err == tfa_error_ok) {
+	if (err == TFA98XX_ERROR_OK) {
 		/* set RE25 in shadow regiser */
 		err = tfa_dev_mtp_set(tfa, TFA_MTP_RE25_PRIM, value);
 	}
-	if (err == tfa_error_ok) {
+	if (err == TFA98XX_ERROR_OK) {
 		/* set MTPEX to copy RE25 into MTP */
 		err = tfa_dev_mtp_set(tfa, TFA_MTP_EX, 2);
 	}
@@ -199,10 +199,10 @@ static enum tfa_error tfa98xx_write_re25(struct tfa_device *tfa, int value)
 }
 
 /* Wrapper for tfa start */
-static enum tfa_error
+static enum tfa98xx_error
 tfa98xx_tfa_start(struct tfa98xx *tfa98xx, int next_profile, int vstep)
 {
-	enum tfa_error err;
+	enum tfa98xx_error err;
 	ktime_t start_time = 0;
 	ktime_t stop_time = 0;
 	u64 delta_time;
@@ -220,11 +220,11 @@ tfa98xx_tfa_start(struct tfa98xx *tfa98xx, int next_profile, int vstep)
 			next_profile, vstep, delta_time);
 	}
 
-	if ((err == tfa_error_ok) && (tfa98xx->set_mtp_cal)) {
-		enum tfa_error err_cal;
+	if ((err == TFA98XX_ERROR_OK) && (tfa98xx->set_mtp_cal)) {
+		enum tfa98xx_error err_cal;
 
 		err_cal = tfa98xx_write_re25(tfa98xx->tfa, tfa98xx->cal_data);
-		if (err_cal != tfa_error_ok) {
+		if (err_cal != TFA98XX_ERROR_OK) {
 			pr_err("Error, setting calibration value in mtp, err=%d\n",
 				err_cal);
 		} else {
@@ -281,7 +281,7 @@ static int tfa98xx_dbgfs_otc_set(void *data, u64 val)
 {
 	struct i2c_client *i2c = (struct i2c_client *)data;
 	struct tfa98xx *tfa98xx = i2c_get_clientdata(i2c);
-	enum tfa_error err;
+	enum tfa98xx_error err;
 
 	if (tfa98xx->tfa->tfa_family == 0) {
 		pr_err("[0x%x] %s: system is not initialized: not probed yet!\n",
@@ -299,7 +299,7 @@ static int tfa98xx_dbgfs_otc_set(void *data, u64 val)
 	err = tfa_dev_mtp_set(tfa98xx->tfa, TFA_MTP_OTC, val);
 	mutex_unlock(&tfa98xx->dsp_lock);
 
-	if (err != tfa_error_ok) {
+	if (err != TFA98XX_ERROR_OK) {
 		pr_err("[0x%x] Unable to access MTPOTC: err %d\n",
 			tfa98xx->i2c->addr, err);
 		return -EIO;
@@ -342,7 +342,7 @@ static int tfa98xx_dbgfs_mtpex_set(void *data, u64 val)
 {
 	struct i2c_client *i2c = (struct i2c_client *)data;
 	struct tfa98xx *tfa98xx = i2c_get_clientdata(i2c);
-	enum tfa_error err;
+	enum tfa98xx_error err;
 	enum tfa98xx_error ret;
 	u16 temp_val = DEFAULT_REF_TEMP;
 	int idx, ndev;
@@ -377,7 +377,7 @@ static int tfa98xx_dbgfs_mtpex_set(void *data, u64 val)
 	err = tfa_dev_mtp_set(tfa98xx->tfa, TFA_MTP_EX, 0);
 	mutex_unlock(&tfa98xx->dsp_lock);
 
-	if (err != tfa_error_ok) {
+	if (err != TFA98XX_ERROR_OK) {
 		pr_err("[0x%x] Unable to access MTPEX: err %d (suspended)\n",
 			tfa98xx->i2c->addr, err);
 		/* suspend until TFA98xx is active */
@@ -622,7 +622,7 @@ static ssize_t tfa98xx_dbgfs_dsp_state_set(struct file *file,
 {
 	struct i2c_client *i2c = file->private_data;
 	struct tfa98xx *tfa98xx = i2c_get_clientdata(i2c);
-	enum tfa_error ret;
+	enum tfa98xx_error ret;
 	char buf[32];
 	static const char start_cmd[] = "start";
 	static const char stop_cmd[] = "stop";
@@ -1393,7 +1393,7 @@ static int tfa98xx_run_calibration(struct tfa98xx *tfa98xx0)
 {
 	struct tfa98xx *tfa98xx;
 	struct tfa_device *tfa;
-	enum tfa_error ret, cal_err = tfa_error_ok;
+	enum tfa98xx_error ret, cal_err = TFA98XX_ERROR_OK;
 	int idx, ndev = tfa98xx_device_count;
 	int cal_profile = 0;
 	u64 otc_val = 1; /* calibration once by default */
@@ -1511,7 +1511,7 @@ static int tfa98xx_run_calibration(struct tfa98xx *tfa98xx0)
 		}
 
 		ret = tfa98xx_tfa_start(tfa98xx, cal_profile, tfa98xx->vstep);
-		if (ret != tfa_error_ok) {
+		if (ret != TFA98XX_ERROR_OK) {
 			pr_warn("[0x%x] failure in starting device for calibration! (err %d)\n",
 				tfa98xx->i2c->addr, ret);
 			cal_err |= ret;
@@ -2122,7 +2122,7 @@ static int tfa98xx_set_device_ctl(struct snd_kcontrol *kcontrol,
 {
 	struct tfa98xx *tfa98xx;
 	struct tfa_device *tfa = NULL;
-	enum tfa_error err;
+	enum tfa98xx_error err;
 	int dev;
 	int request;
 
@@ -2402,7 +2402,7 @@ static int tfa98xx_set_pause_ctl(struct snd_kcontrol *kcontrol,
 {
 	struct tfa98xx *tfa98xx;
 	struct tfa_device *tfa = NULL;
-	enum tfa_error err;
+	enum tfa98xx_error err;
 	int dev;
 	int request;
 
@@ -2583,14 +2583,14 @@ static int tfa98xx_set_cal_ctl(struct snd_kcontrol *kcontrol,
 
 	mutex_lock(&tfa98xx_mutex);
 	list_for_each_entry(tfa98xx, &tfa98xx_device_list, list) {
-		enum tfa_error err;
+		enum tfa98xx_error err;
 		int i = tfa98xx->tfa->dev_idx;
 
 		tfa98xx->cal_data = (uint16_t)ucontrol->value.integer.value[i];
 
 		mutex_lock(&tfa98xx->dsp_lock);
 		err = tfa98xx_write_re25(tfa98xx->tfa, tfa98xx->cal_data);
-		tfa98xx->set_mtp_cal = (err != tfa_error_ok);
+		tfa98xx->set_mtp_cal = (err != TFA98XX_ERROR_OK);
 		if (tfa98xx->set_mtp_cal == false)
 			pr_info("Calibration value (%d) set in mtp\n",
 				tfa98xx->cal_data);
@@ -4714,7 +4714,7 @@ static ssize_t tfa98xx_mtpex_store(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct tfa98xx *tfa98xx = dev_get_drvdata(dev);
-	enum tfa_error err;
+	enum tfa98xx_error err;
 	static const char ref[] = "0"; /* "please calibrate now" */
 	enum tfa98xx_error ret;
 	u16 temp_val = DEFAULT_REF_TEMP;
@@ -4755,7 +4755,7 @@ static ssize_t tfa98xx_mtpex_store(struct device *dev,
 	err = tfa_dev_mtp_set(tfa98xx->tfa, TFA_MTP_EX, 0);
 	mutex_unlock(&tfa98xx->dsp_lock);
 
-	if (err != tfa_error_ok) {
+	if (err != TFA98XX_ERROR_OK) {
 		pr_err("[0x%x] Unable to access MTPEX: err %d (suspended)\n",
 			tfa98xx->i2c->addr, err);
 		/* suspend until TFA98xx is active */
