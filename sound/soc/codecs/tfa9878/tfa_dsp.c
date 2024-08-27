@@ -2876,7 +2876,7 @@ enum tfa98xx_error tfa_set_calibration_values(struct tfa_device *tfa)
 	struct tfa_device *ntfa;
 	int i;
 	char reg_state[50] = {0};
-	enum tfa_error ret = tfa_error_ok;
+	enum tfa98xx_error ret = TFA98XX_ERROR_OK;
 	int cal_ready = 1;
 
 	/* at initial device only: to reset need_cal and is_bypass */
@@ -3250,8 +3250,7 @@ enum tfa98xx_error tfa_run_speaker_boost(struct tfa_device *tfa,
 enum tfa98xx_error
 tfa_run_speaker_startup(struct tfa_device *tfa, int force, int profile)
 {
-	enum tfa98xx_error err = TFA98XX_ERROR_OK;
-	enum tfa_error ret = tfa_error_ok;
+	enum tfa98xx_error err, ret = TFA98XX_ERROR_OK;
 	struct tfa_device *ntfa;
 	int i;
 	struct tfa_device *tfa0 = NULL;
@@ -4244,7 +4243,7 @@ int tfa_is_active_device(struct tfa_device *tfa)
  * for calibrating or acoustic shock
  * handling use tfa98xxCalibration function.
  */
-enum tfa_error tfa_dev_start(struct tfa_device *tfa,
+enum tfa98xx_error tfa_dev_start(struct tfa_device *tfa,
 	int next_profile, int vstep)
 {
 	enum tfa98xx_error err = TFA98XX_ERROR_OK;
@@ -4495,7 +4494,7 @@ tfa_dev_start_exit:
 	return err;
 }
 
-enum tfa_error tfa_dev_switch_profile(struct tfa_device *tfa,
+enum tfa98xx_error tfa_dev_switch_profile(struct tfa_device *tfa,
 	int next_profile, int vstep)
 {
 	enum tfa98xx_error err = TFA98XX_ERROR_OK;
@@ -4557,7 +4556,7 @@ enum tfa_error tfa_dev_switch_profile(struct tfa_device *tfa,
 	return err;
 }
 
-enum tfa_error tfa_dev_stop(struct tfa_device *tfa)
+enum tfa98xx_error tfa_dev_stop(struct tfa_device *tfa)
 {
 	enum tfa98xx_error err = TFA98XX_ERROR_OK;
 
@@ -4871,8 +4870,7 @@ tfa_dsp_get_calibration_impedance(struct tfa_device *tfa)
 
 static enum tfa98xx_error tfa_process_re25(struct tfa_device *tfa)
 {
-	enum tfa98xx_error error = TFA98XX_ERROR_OK;
-	enum tfa_error ret = tfa_error_ok;
+	enum tfa98xx_error error, ret = TFA98XX_ERROR_OK;
 	unsigned char bytes[2 * 3] = {0};
 	int data[2];
 	int nr_bytes, i, spkr_count = 0, cal_idx = 0;
@@ -5710,10 +5708,10 @@ int tfa_dev_mtp_get(struct tfa_device *tfa, enum tfa_mtp item)
 	return value;
 }
 
-enum tfa_error tfa_dev_mtp_set(struct tfa_device *tfa,
+enum tfa98xx_error tfa_dev_mtp_set(struct tfa_device *tfa,
 	enum tfa_mtp item, int value)
 {
-	enum tfa_error err = tfa_error_ok;
+	enum tfa98xx_error err = TFA98XX_ERROR_OK;
 
 	switch (item) {
 	case TFA_MTP_OTC:
@@ -5757,7 +5755,7 @@ enum tfa_error tfa_dev_mtp_set(struct tfa_device *tfa,
 			TFA_SET_BF(tfa, R25CR, (uint16_t)value);
 		else {
 			pr_debug("Error: Current device has no secondary Re25 channel\n");
-			err = tfa_error_bad_param;
+			err = TFA98XX_ERROR_BAD_PARAMETER;
 		}
 		break;
 	case TFA_MTP_LOCK:
@@ -5767,7 +5765,7 @@ enum tfa_error tfa_dev_mtp_set(struct tfa_device *tfa,
 		break;
 	}
 
-	if (err != tfa_error_ok)
+	if (err != TFA98XX_ERROR_OK)
 		pr_err("%s: error (%d) in setting MTP (item %d with %d)\n",
 			__func__, err, item, value);
 
