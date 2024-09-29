@@ -25,20 +25,29 @@
 
 #include <linux/sched.h>
 #include <linux/kthread.h>
-#include <linux/hrtimer.h>
 #include <linux/ktime.h>
-#include <mt6877_spm_comm.h>
+#include <linux/sched/signal.h>
+#include <linux/spinlock.h>
+#include <uapi/linux/sched/types.h>
+
 #include <mtk_lpm.h>
 #include <mtk_lpm_module.h>
 #include <mtk_lpm_call.h>
 #include <mtk_lpm_type.h>
 #include <mtk_lpm_call_type.h>
 #include <mtk_dbg_common_v1.h>
+#include <mtk_cpuidle_status.h>
+#include <mt6877_spm_comm.h>
 #include <mt-plat/mtk_ccci_common.h>
 #include <uapi/linux/sched/types.h>
-#include <mtk_cpuidle_status.h>
 #include "mt6877.h"
 #include "mt6877_suspend.h"
+
+#if IS_ENABLED(CONFIG_SEC_PM)
+#include <linux/regulator/consumer.h>
+extern void sec_clock_debug_print_enabled(void);
+#endif /* CONFIG_SEC_PM */
+
 
 unsigned int mt6877_suspend_status;
 struct md_sleep_status before_md_sleep_status;
@@ -170,6 +179,11 @@ static int __mt6877_suspend_prompt(int type, int cpu,
 
 	printk_deferred("[name:spm&][%s:%d] - prepare suspend enter\n",
 			__func__, __LINE__);
+
+#if IS_ENABLED(CONFIG_SEC_PM)
+			regulator_debug_print_enabled();
+			sec_clock_debug_print_enabled();
+#endif /* CONFIG_SEC_PM */
 
 	ret = mt6877_suspend_common_enter(&mt6877_suspend_status);
 
@@ -311,13 +325,16 @@ struct mtk_lpm_model mt6877_model_suspend = {
 
 #ifdef CONFIG_PM
 #define CPU_NUMBER (NR_CPUS)
+
 struct mtk_lpm_abort_control {
 	struct task_struct *ts;
 	int cpu;
 };
+
 static struct mtk_lpm_abort_control mtk_lpm_ac[CPU_NUMBER];
 static int mtk_lpm_in_suspend;
 static struct hrtimer lpm_hrtimer[NR_CPUS];
+
 static enum hrtimer_restart lpm_hrtimer_timeout(struct hrtimer *timer)
 {
 	if (mtk_lpm_in_suspend) {
@@ -373,6 +390,10 @@ static int mt6877_spm_suspend_pm_event(struct notifier_block *notifier,
 	case PM_POST_HIBERNATION:
 		return NOTIFY_DONE;
 	case PM_SUSPEND_PREPARE:
+		printk_deferred(
+			"[name:spm&][SPM] PM: suspend entry %d-%02d-%02d %02d:%02d:%02d.%09lu UTC\n",
+			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+			tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
 		mtk_s2idle_state_enable(1);
 		cpu_hotplug_disable();
 		suspend_online_cpus = num_online_cpus();
@@ -419,6 +440,11 @@ static int mt6877_spm_suspend_pm_event(struct notifier_block *notifier,
 				send_sig(SIGKILL, mtk_lpm_ac[cpu].ts, 0);
 		}
 		spin_unlock(&lpm_abort_locker);
+
+		printk_deferred(
+		"[name:spm&][SPM] PM: suspend exit %d-%02d-%02d %02d:%02d:%02d.%09lu UTC\n",
+			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+			tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
 		return NOTIFY_DONE;
 	}
 	return NOTIFY_OK;
@@ -461,7 +487,6 @@ int __init mt6877_model_suspend_init(void)
 		pr_debug("[name:spm&][SPM] Failed to register PM notifier.\n");
 		return ret;
 	}
-
 	for (i = 0; i < CPU_NUMBER; i++) {
 		hrtimer_init(&lpm_hrtimer[i], CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 		lpm_hrtimer[i].function = lpm_hrtimer_timeout;

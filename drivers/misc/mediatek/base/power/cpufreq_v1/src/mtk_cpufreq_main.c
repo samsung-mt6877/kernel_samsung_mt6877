@@ -19,6 +19,10 @@
 
 #define DCM_ENABLE 1
 
+#ifdef CONFIG_CPU_FREQ_LIMIT
+#include <linux/cpufreq_limit.h>
+#endif /* CONFIG_CPU_FREQ_LIMIT  */
+
 #define met_tag_oneshot(a, b, c) do {} while (0)
 //#define _set_met_tag_oneshot(a, bz) do{}while(0)
 
@@ -1331,7 +1335,7 @@ static struct freq_attr *_mt_cpufreq_attr[] = {
 
 static struct cpufreq_driver _mt_cpufreq_driver = {
 #if defined(CONFIG_MTK_PLAT_MT6885_EMULATION) || defined(CONFIG_MACH_MT6893) \
-	|| defined(CONFIG_MACH_MT6833)
+	|| defined(CONFIG_MACH_MT6833) || defined(CONFIG_MACH_MT6781)
 	.flags = CPUFREQ_ASYNC_NOTIFICATION | CPUFREQ_HAVE_GOVERNOR_PER_POLICY,
 #else
 	.flags = CPUFREQ_ASYNC_NOTIFICATION,
@@ -1442,8 +1446,6 @@ static void _hps_request_wrapper(struct mt_cpu_dvfs *p,
 			aee_record_cpu_dvfs_cb(9);
 #endif
 			act_p->mt_policy = NULL;
-			tag_pr_info("[CPU DVFS] policy of %s set NULL on cpu_down\n",
-				cpu_dvfs_get_name(p));
 			aee_record_cpu_dvfs_cb(10);
 		}
 		break;
@@ -1760,6 +1762,9 @@ static int __init _mt_cpufreq_tbl_init(void)
 			p->opp_tbl = opp_tbl_info->opp_tbl;
 			p->nr_opp_tbl = opp_tbl_info->size;
 			p->freq_tbl_for_cpufreq = table;
+#ifdef CONFIG_CPU_FREQ_LIMIT
+			cpufreq_limit_set_table(p->cpu_id, table);
+#endif /* CONFIG_CPU_FREQ_LIMIT  */
 		}
 	}
 	return 0;

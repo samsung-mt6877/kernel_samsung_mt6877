@@ -13,10 +13,15 @@
 
 #include "inc/tcpci.h"
 #include "inc/tcpci_typec.h"
+#include "inc/pd_dpm_core.h"
 
 #ifdef CONFIG_USB_POWER_DELIVERY
 #include "inc/tcpci_event.h"
 #endif /* CONFIG_USB_POWER_DELIVERY */
+
+#if IS_ENABLED(CONFIG_PDIC_NOTIFIER)
+#include <linux/usb/typec/common/pdic_notifier.h>
+#endif
 
 /*
  * [BLOCK] TCPCI IRQ Handler
@@ -548,11 +553,46 @@ static inline int tcpci_set_wake_lock_pd(
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_PDIC_NOTIFIER)
+void tcpci_port_role_event_work(uint8_t type)
+{
+	PD_NOTI_TYPEDEF pdic_noti = {
+		.src = PDIC_NOTIFY_DEV_PDIC,
+		.dest = PDIC_NOTIFY_DEV_MUIC,
+		.id = PDIC_NOTIFY_ID_ATTACH,
+		.sub3 = 0,
+	};
+
+	switch (type) {
+	case TYPEC_UNATTACHED:
+		pdic_noti.sub1 = !!type;
+		pdic_noti.sub2 = 0; /*rprd*/
+		break;
+	case TYPEC_ATTACHED_SNK:
+		pdic_noti.sub1 = !!type;
+		pdic_noti.sub2 = 0; /*rprd*/
+		break;
+	case TYPEC_ATTACHED_SRC:
+		pdic_noti.sub1 = !!type;
+		pdic_noti.sub2 = 1; /*rprd*/
+		break;
+	default:
+		return;
+	}
+
+	pdic_notifier_notify((PD_NOTI_TYPEDEF *)&pdic_noti, 0, 0);
+}
+#endif
+
 static inline int tcpci_report_usb_port_attached(struct tcpc_device *tcpc)
 {
 	TCPC_INFO("usb_port_attached\n");
 
 	tcpci_set_wake_lock_pd(tcpc, true);
+	tcpci_set_vbus_dischg_gpio(tcpc, 0);
+#if IS_ENABLED(CONFIG_PDIC_NOTIFIER)
+	tcpci_port_role_event_work(tcpc->typec_attach_new);
+#endif
 
 #ifdef CONFIG_USB_POWER_DELIVERY
 
@@ -573,6 +613,9 @@ static inline int tcpci_report_usb_port_detached(struct tcpc_device *tcpc)
 {
 	TCPC_INFO("usb_port_detached\n");
 
+#if IS_ENABLED(CONFIG_PDIC_NOTIFIER)
+	tcpci_port_role_event_work(tcpc->typec_attach_new);
+#endif
 #ifdef CONFIG_USB_POWER_DELIVERY
 	/* MTK Only */
 	if (tcpc->pd_inited_flag)
@@ -583,6 +626,11 @@ static inline int tcpci_report_usb_port_detached(struct tcpc_device *tcpc)
 	}
 #endif /* CONFIG_USB_POWER_DELIVERY */
 
+#if IS_ENABLED(CONFIG_PDIC_NOTIFIER)
+	sec_dfp_accessory_detach_handler(&tcpc->pd_port);
+#endif /* CONFIG_PDIC_NOTIFIER */
+
+	tcpci_set_vbus_dischg_gpio(tcpc, 1);
 	tcpci_set_wake_lock_pd(tcpc, false);
 	return 0;
 }

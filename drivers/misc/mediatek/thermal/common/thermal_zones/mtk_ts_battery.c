@@ -156,6 +156,14 @@ pr_debug("[Thermal/TZ/BATTERY]" fmt, ##args)
  */
 static int get_hw_battery_temp(void)
 {
+#if defined(CONFIG_BATTERY_SAMSUNG)
+/*
+ * When HW team is testing device in high temperatures there is always kernel panic from MTK thermal side
+ * So, disable MTK battery thermal (ALPS05253270)
+ *
+ */
+	return 250;
+#else
 	union power_supply_propval prop;
 	struct power_supply *psy;
 	int ret = 0;
@@ -170,6 +178,7 @@ static int get_hw_battery_temp(void)
 		return -1270;
 
 	return prop.intval;
+#endif
 }
 
 static DEFINE_MUTEX(Battery_lock);

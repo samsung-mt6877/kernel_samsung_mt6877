@@ -62,7 +62,7 @@ ccflags-y += -DTEE_DEVICES_SUPPORT
 trusted_mem-y += tee_impl/tee_invoke.o
 
 ifneq ($(filter y m,$(CONFIG_MICROTRUST_TEE_SUPPORT) \
-		  $(CONFIG_TRUSTONIC_TEE_SUPPORT)),)
+		  $(CONFIG_TRUSTONIC_TEE_SUPPORT) $(CONFIG_TEEGRIS_TEE_SUPPORT)),)
 trusted_mem-y += tee_impl/tee_ops.o
 endif
 endif
@@ -114,3 +114,8 @@ endif # !CONFIG_MICROTRUST_TEE_SUPPORT
 ifneq ($(filter y m,$(CONFIG_BLOWFISH_TEE_SUPPORT)),)
 ccflags-y += -I$(srctree)/drivers/misc/tzdev
 endif # !CONFIG_BLOWFISH_TEE_SUPPORT
+
+ifeq ($(CONFIG_TEEGRIS_TEE_SUPPORT),y)
+ccflags-y += -I$(srctree)/drivers/misc/tzdev/$(CONFIG_TEEGRIS_VERSION_STRING)
+include $(srctree)/drivers/misc/tzdev/Makefile.include
+endif # CONFIG_TEEGRIS_TEE_SUPPORT

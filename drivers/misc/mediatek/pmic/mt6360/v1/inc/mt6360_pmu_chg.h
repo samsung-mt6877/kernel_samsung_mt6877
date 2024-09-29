@@ -6,6 +6,11 @@
 #ifndef __MT6360_PMU_CHG_H
 #define __MT6360_PMU_CHG_H
 
+/* Define this macro if detecting apple samsung TA is needed */
+#if !defined(CONFIG_SEC_FACTORY)
+#define MT6360_APPLE_SAMSUNG_TA_SUPPORT
+#endif
+
 /* Define this macro if DCD timeout is supported */
 #define CONFIG_MT6360_DCDTOUT_SUPPORT
 
@@ -24,6 +29,9 @@ struct mt6360_chg_platform_data {
 	u32 aicc_once;
 	u32 post_aicc;
 	u32 batoc_notify;
+#if defined(CONFIG_SEC_FACTORY)
+	u32 dcd_timeout;
+#endif
 	const char *chg_name;
 };
 
@@ -69,11 +77,17 @@ struct mt6360_chg_platform_data {
 #define MT6360_MASK_ICHG	(0xFC)
 #define MT6360_SHFT_ICHG	(2)
 #define MT6360_ICHG_MAXVAL	(0x31)
+#if defined(CONFIG_BATTERY_SAMSUNG)
+#define MT6360_MASK_EOC_TIMER	(0x03)
+#endif
 
 /* MT6360_PMU_CHG_CTRL9 : 0x19 */
 #define MT6360_MASK_IEOC	(0xF0)
 #define MT6360_SHFT_IEOC	(4)
 #define MT6360_IEOC_MAXVAL	(0x0F)
+#if defined(CONFIG_BATTERY_SAMSUNG)
+#define MT6360_MASK_EOC_EN	BIT(3)
+#endif
 
 /* MT6360_PMU_CHG_AICC_RESULT : 0x21 */
 #define MT6360_MASK_RG_AICC_RESULT	(0xFC)
@@ -83,6 +97,11 @@ struct mt6360_chg_platform_data {
 #define MT6360_MASK_OTG_OC	(0x07)
 #define MT6360_SHFT_OTG_OC	(0)
 #define MT6360_OTG_OC_MAXVAL	(0x07)
+
+#if defined(CONFIG_BATTERY_SAMSUNG)
+/* MT6360_PMU_CHG_CTRL11 : 0x1B */
+#define MT6360_MASK_VRECH	(0x03)
+#endif
 
 /* MT6360_PMU_CHG_CTRL12 : 0x1C */
 #define MT6360_MASK_TMR_EN	BIT(1)
@@ -129,6 +148,12 @@ struct mt6360_chg_platform_data {
 #define MT6360_SHFT_VCLAMP	(0)
 #define MT6360_VCLAMP_MAXVAL	(0x07)
 
+#if defined(CONFIG_BATTERY_SAMSUNG)
+/* MT6360_PMU_CHRDET_CTRL1 */
+#define MT6360_MASK_CHRDETB_VBUS_OVP	(0x0F)
+#define MT6360_CHRDETB_VBUS_OVP_12_5	(0x08)
+#endif
+
 /* MT6360_PMU_CHG_HIDDEN_CTRL2 : 0x31 */
 #define MT6360_MASK_EOC_RST	BIT(7)
 #define MT6360_MASK_DISCHG	BIT(2)
@@ -137,6 +162,10 @@ struct mt6360_chg_platform_data {
 /* MT6360_PMU_CHG_STAT : 0x4A */
 #define MT6360_MASK_CHG_STAT	(0xC0)
 #define MT6360_SHFT_CHG_STAT	(6)
+#if defined(CONFIG_BATTERY_SAMSUNG)
+#define MT6360_MASK_VBAT_LVL		BIT(5)
+#define MT6360_MASK_VBAT_TRICKLE	BIT(4)
+#endif
 #define MT6360_MASK_CHG_BATSYSUV	BIT(1)
 
 /* MT6360_PMU_TYPEC_OTP_CTRL: 0x51 */
@@ -150,6 +179,10 @@ struct mt6360_chg_platform_data {
 /* MT6360_PMU_CHG_CTRL19 : 0x61 */
 #define MT6360_MASK_CHG_VIN_OVP_VTHSEL	(0x60)
 #define MT6360_SHFT_CHG_VIN_OVP_VTHSEL	(5)
+
+/* MT6360_PMU_CHRDET_CTRL1 : 0x2D */
+#define MT6360_MASK_CHRDETB_VIN_OVP_VTHSEL	(0xF)
+#define MT6360_SHFT_CHRDETB_VIN_OVP_VTHSEL	(0)
 
 /* MT6360_PMU_FOD_CTRL : 0x65 */
 #define MT6360_MASK_FOD_SWEN	BIT(7)
@@ -179,7 +212,24 @@ struct mt6360_chg_platform_data {
 #define MT6360_MASK_CHG_TREG	BIT(4)
 #define MT6360_SHFT_CHG_TREG	(4)
 
+#if defined(CONFIG_BATTERY_SAMSUNG)
+/* MT6360_PMU_CHG_STAT2 : 0xE1 */
+#define MT6360_MASK_CHG_VSYSOV	BIT(5)
+#endif
+
 /* MT6360_PMU_CHG_STAT4 : 0xE3 */
+#if defined(CONFIG_BATTERY_SAMSUNG)
+#define MT6360_MASK_OTPI	BIT(7)
+#endif
 #define MT6360_MASK_CHG_TMRI	BIT(3)
+
+#if defined(CONFIG_BATTERY_SAMSUNG)
+/* MT6360_PMU_CHG_STAT5 : 0xE4 */
+#define MT6360_MASK_WDTMRI	BIT(3)
+
+/* MT6360_PMU_CHRDET_STAT : 0xE7 */
+#define MT6360_MASK_CHRDETB_OVP		BIT(3)
+#define MT6360_MASK_CHRDETB_UVPB	BIT(2)
+#endif
 
 #endif /* __MT6360_PMU_CHG_H */

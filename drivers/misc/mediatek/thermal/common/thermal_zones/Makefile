@@ -208,11 +208,13 @@ ifneq ($(CONFIG_MTK_COMBO_WIFI),)
 endif
 
 obj-$(CONFIG_THERMAL) += mtk_tsAll.o
-obj-$(CONFIG_THERMAL) += mtk_ts_imgsensor.o
+# obj-$(CONFIG_THERMAL) += mtk_ts_imgsensor.o
 endif
 
 ifneq (,$(filter $(CONFIG_MTK_PLATFORM), "mt6768"))
+ifeq ($(CONFIG_MTK_GAUGE_VERSION),30)
 obj-$(CONFIG_THERMAL) += mtk_ts_battery.o
+endif
 
 obj-$(CONFIG_THERMAL) += mtk_ts_bts.o
 obj-$(CONFIG_THERMAL) += mtk_ts_btsmdpa.o
@@ -221,7 +223,9 @@ obj-$(CONFIG_THERMAL) += mtk_ts_cpu_noBank.o
 obj-$(CONFIG_THERMAL) += mtk_ts_pa.o
 obj-$(CONFIG_THERMAL) += mtk_ts_pa_thput.o
 
+ifeq ($(CONFIG_MTK_GAUGE_VERSION),30)
 obj-$(CONFIG_THERMAL) += mtk_ts_charger.o
+endif
 #obj-$(CONFIG_THERMAL) += mtk_ts_charger2.o
 
 ifneq ($(CONFIG_MTK_COMBO_WIFI),)

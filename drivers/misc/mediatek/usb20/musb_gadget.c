@@ -34,6 +34,15 @@
 #include "musb_qmu.h"
 #endif
 
+#ifdef CONFIG_USB_NOTIFY_PROC_LOG
+#include <linux/usb_notify.h>
+#endif
+#if defined(CONFIG_BATTERY_SAMSUNG)
+#include "../../../battery/common/sec_charging_common.h"
+#endif
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+extern bool acc_dev_status;
+#endif
 #define FIFO_START_ADDR 512
 
 /* #define RX_DMA_MODE1 1 */
@@ -2250,22 +2259,25 @@ static int musb_gadget_vbus_draw
 	return usb_phy_set_power(musb->xceiv, mA);
 }
 
-/* default value 0 */
-static int usb_rdy;
-void set_usb_rdy(void)
-{
-	DBG(0, "set usb_rdy, wake up bat\n");
-	usb_rdy = 1;
-}
-
 bool is_usb_rdy(void)
 {
-	if (usb_rdy)
-		return true;
-	else
-		return false;
+	return true;
 }
 EXPORT_SYMBOL(is_usb_rdy);
+
+static void musb_set_usb_bootcomplete(struct musb *musb)
+{
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	union power_supply_propval propval = {0,};
+
+	pr_info("%s\n", __func__);
+	propval.intval = 1;
+	psy_do_property("battery", set,
+			POWER_SUPPLY_EXT_PROP_USB_BOOTCOMPLETE,
+			propval);
+#endif
+	musb->usb_bootcomplete = 1;
+}
 
 static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 {
@@ -2294,7 +2306,7 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 
 	if (!musb->is_ready && is_on) {
 		musb->is_ready = true;
-		//set_usb_rdy();
+
 		/* direct issue connection work if usb is forced on */
 		if (musb_force_on) {
 			DBG(0, "mt_usb_connect() on is_ready begin\n");
@@ -2305,8 +2317,17 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 		}
 	}
 
-	if (!is_usb_rdy() && is_on)
-		set_usb_rdy();
+	if (is_on && !musb->usb_bootcomplete)
+		musb_set_usb_bootcomplete(musb);
+
+#ifdef CONFIG_USB_NOTIFY_PROC_LOG
+	if (is_on)
+		store_usblog_notify(NOTIFY_USBSTATE,
+			(void *)"USB_STATE=PULLUP:EN", NULL);
+	else
+		store_usblog_notify(NOTIFY_USBSTATE,
+			(void *)"USB_STATE=PULLUP:DIS", NULL);
+#endif
 
 	spin_unlock_irqrestore(&musb->lock, flags);
 
@@ -2632,6 +2653,16 @@ static int musb_gadget_stop(struct usb_gadget *g)
 		musb->is_active = is_active;
 		musb->xceiv->otg->state = state;
 	}
+
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+	if (musb->rst_err_noti) {
+		musb->event_state = RELEASE;
+		musb->rst_err_noti = false;
+		schedule_delayed_work(&musb->usb_event_work, msecs_to_jiffies(0));
+	}
+	musb->rst_err_cnt = 0;
+	acc_dev_status = 0;
+#endif
 
 	spin_unlock_irqrestore(&musb->lock, flags);
 
@@ -2987,6 +3018,9 @@ void musb_g_reset(struct musb *musb)
 	u8 devctl = musb_readb(mbase, MUSB_DEVCTL);
 	u8 power;
 	struct musb_ep		*ep;
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+	ktime_t current_time;
+#endif
 
 	DBG(2, "<== %s driver '%s'\n", (devctl & MUSB_DEVCTL_BDEVICE)
 	    ? "B-Device" : "A-Device",
@@ -3006,6 +3040,11 @@ void musb_g_reset(struct musb *musb)
 	/* active wake lock */
 	if (!musb->usb_lock->active)
 		__pm_stay_awake(musb->usb_lock);
+
+#ifndef FPGA_PLATFORM
+	musb_platform_reset(musb);
+	musb_generic_disable(musb);
+#endif
 
 	/* re-init interrupt setting */
 	musb->intrrxe = 0;
@@ -3066,6 +3105,35 @@ void musb_g_reset(struct musb *musb)
 		musb->xceiv->otg->state = OTG_STATE_A_PERIPHERAL;
 		musb->g.is_a_peripheral = 1;
 	}
+
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+	if (acc_dev_status && (musb->rst_err_noti == false)) {
+		current_time = ktime_to_ms(ktime_get_boottime());
+
+		if (musb->rst_err_cnt == 0) {
+			if ((current_time - musb->rst_time_before) < 1000) {
+				musb->rst_err_cnt++;
+				musb->rst_time_first = musb->rst_time_before;
+			}
+		} else {
+			if ((current_time - musb->rst_time_first) < 1000)
+				musb->rst_err_cnt++;
+			else
+				musb->rst_err_cnt = 0;
+		}
+
+		if (musb->rst_err_cnt > ERR_RESET_CNT) {
+			musb->event_state = NOTIFY;
+			schedule_delayed_work(&musb->usb_event_work, msecs_to_jiffies(0));
+			musb->rst_err_noti = true;
+		}
+
+		pr_info("usb: %s rst_err_cnt: %d, time_current: %d, time_before: %d\n",
+			__func__, musb->rst_err_cnt, current_time, musb->rst_time_before);
+
+		musb->rst_time_before = current_time;
+	}
+#endif
 
 	/* start with default limits on VBUS power draw */
 	(void)musb_gadget_vbus_draw(&musb->g, 8);

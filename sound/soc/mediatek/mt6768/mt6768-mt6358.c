@@ -25,6 +25,12 @@
 #define EXT_SPK_AMP_W_NAME "Ext_Speaker_Amp"
 
 static const char *const mt6768_spk_type_str[] = {MTK_SPK_NOT_SMARTPA_STR,
+#if defined(CONFIG_SND_SOC_AW8896)
+						  MTK_SPK_AWINIC_AW8896_STR,
+#endif
+#if defined(CONFIG_SND_SMARTPA_AW882XX)
+						  MTK_SPK_AWINIC_AW882XX_STR,
+#endif
 						  MTK_SPK_RICHTEK_RT5509_STR,
 						  MTK_SPK_MEDIATEK_MT6660_STR};
 static const char *const mt6768_spk_i2s_type_str[] = {MTK_SPK_I2S_0_STR,
@@ -496,6 +502,30 @@ static struct snd_soc_dai_link mt6768_mt6358_dai_links[] = {
 		.ignore_suspend = 1,
 	},
 	{
+		.name = "Hostless_FM_Record",
+		.stream_name = "Hostless_FM_Record",
+		.cpu_dai_name = "Hostless FM RECORD DAI",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
+			    SND_SOC_DPCM_TRIGGER_PRE},
+		.dynamic = 1,
+		.dpcm_capture = 1,
+		.ignore_suspend = 1,
+	},
+	{
+		.name = "Hostless_ADDA_DL_HWGain",
+		.stream_name = "Hostless_ADDA_DL_HWGain",
+		.cpu_dai_name = "Hostless_ADDA_DL_HWGain DAI",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+		.trigger = {SND_SOC_DPCM_TRIGGER_PRE,
+			    SND_SOC_DPCM_TRIGGER_PRE},
+		.dynamic = 1,
+		.dpcm_playback = 1,
+		.ignore_suspend = 1,
+	},
+	{
 		.name = "Hostless_Speech",
 		.stream_name = "Hostless_Speech",
 		.cpu_dai_name = "Hostless Speech DAI",
@@ -560,13 +590,8 @@ static struct snd_soc_dai_link mt6768_mt6358_dai_links[] = {
 	{
 		.name = "I2S3",
 		.cpu_dai_name = "I2S3",
-#ifdef CONFIG_SND_SOC_FS16XX
-		.codec_dai_name = "fs16xx-aif",
-		.codec_name = "fs16xx",
-#else
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
-#endif
 		.no_pcm = 1,
 		.dpcm_playback = 1,
 		.ignore_suspend = 1,
@@ -575,13 +600,8 @@ static struct snd_soc_dai_link mt6768_mt6358_dai_links[] = {
 	{
 		.name = "I2S0",
 		.cpu_dai_name = "I2S0",
-#ifdef CONFIG_SND_SOC_FS16XX
-		.codec_dai_name = "fs16xx-aif",
-		.codec_name = "fs16xx",
-#else
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
-#endif
 		.no_pcm = 1,
 		.dpcm_capture = 1,
 		.ignore_suspend = 1,

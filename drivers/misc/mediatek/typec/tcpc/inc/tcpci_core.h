@@ -25,6 +25,9 @@
 #include <linux/power_supply.h>
 #endif /* CONFIG_USB_PD_WAIT_BC12 */
 #endif
+#if IS_ENABLED(CONFIG_PDIC_NOTIFIER)
+#include <linux/usb/typec/common/pdic_core.h>
+#endif
 
 /* The switch of log message */
 #define TYPEC_INFO_ENABLE	1
@@ -82,18 +85,6 @@ struct tcpc_desc {
 	uint8_t vconn_supply;
 	int notifier_supply_num;
 	char *name;
-#ifdef CONFIG_WATER_DETECTION
-	u32 wd_sbu_calib_init;
-	u32 wd_sbu_pl_bound;
-	u32 wd_sbu_pl_lbound_c2c;
-	u32 wd_sbu_pl_ubound_c2c;
-	u32 wd_sbu_ph_auddev;
-	u32 wd_sbu_ph_lbound;
-	u32 wd_sbu_ph_lbound1_c2c;
-	u32 wd_sbu_ph_ubound1_c2c;
-	u32 wd_sbu_ph_ubound2_c2c;
-	u32 wd_sbu_aud_ubound;
-#endif /* CONFIG_WATER_DETECTION */
 };
 
 /*---------------------------------------------------------------------------*/
@@ -224,12 +215,18 @@ struct tcpc_ops {
 	int (*set_vconn)(struct tcpc_device *tcpc, int enable);
 	int (*deinit)(struct tcpc_device *tcpc);
 	int (*alert_vendor_defined_handler)(struct tcpc_device *tcpc);
+#if defined(CONFIG_USB_FACTORY_MODE)
+/* [ALPS07177780] battery: factory higher sleep current by charger buck mode*/
+	int (*ss_factory)(struct tcpc_device *tcpc);
+#endif
+	void (*set_vbus_dischg_gpio)(struct tcpc_device *tcpc, int value);
 
 #ifdef CONFIG_TCPC_VSAFE0V_DETECT_IC
 	int (*is_vsafe0v)(struct tcpc_device *tcpc);
 #endif /* CONFIG_TCPC_VSAFE0V_DETECT_IC */
 
 #ifdef CONFIG_WATER_DETECTION
+	bool (*is_in_water_detecting)(struct tcpc_device *tcpc);
 	int (*is_water_detected)(struct tcpc_device *tcpc);
 	int (*set_water_protection)(struct tcpc_device *tcpc, bool en);
 	int (*set_usbid_polling)(struct tcpc_device *tcpc, bool en);
@@ -329,6 +326,10 @@ struct tcpc_device {
 	struct mutex access_lock;
 	struct mutex typec_lock;
 	struct mutex timer_lock;
+#ifdef CONFIG_WATER_DETECTION
+	struct mutex wd_lock;
+	struct work_struct wd_report_usb_port_work;
+#endif /* CONFIG_WATER_DETECTION */
 	struct semaphore timer_enable_mask_lock;
 	spinlock_t timer_tick_lock;
 	atomic_t pending_event;
@@ -345,6 +346,9 @@ struct tcpc_device {
 	struct srcu_notifier_head evt_nh[TCP_NOTIFY_IDX_NR];
 	struct tcpc_managed_res *mr_head;
 	struct mutex mr_lock;
+#if IS_ENABLED(CONFIG_PDIC_NOTIFIER)
+	ppdic_data_t ppdic_data;
+#endif
 
 	/* For TCPC TypeC */
 	uint8_t typec_state;
@@ -490,16 +494,40 @@ struct tcpc_device {
 	bool vbus_present;
 	u8 irq_enabled:1;
 	u8 pd_inited_flag:1; /* MTK Only */
+	int bootmode;
 
 	/* TypeC Shield Protection */
 #ifdef CONFIG_WATER_DETECTION
 	int usbid_calib;
-	int bootmode;
+	struct delayed_work wd_status_work;
+	struct task_struct *wd_task;
+	struct alarm wd_wakeup_timer;
+	atomic_t wd_wakeup;
+	atomic_t wd_thread_stop;
+	wait_queue_head_t wd_wait_queue;
+	struct wakeup_source wd_thread_wlock;
+#ifdef CONFIG_WD_INIT_POWER_OFF_CHARGE
+	bool init_pwroff_check;
+#endif /* CONFIG_WD_INIT_POWER_OFF_CHARGE */
+	bool water_state;
+	bool is_water_checked;
+	bool retry_wd;
+#if IS_ENABLED(CONFIG_SEC_HICCUP)
+	bool init_pwroff_hiccup;
+#endif
 #endif /* CONFIG_WATER_DETECTION */
 #ifdef CONFIG_CABLE_TYPE_DETECTION
 	enum tcpc_cable_type typec_cable_type;
-	enum tcpc_cable_type pre_typec_cable_type;
 #endif /* CONFIG_CABLE_TYPE_DETECTION */
+#ifdef CONFIG_CC_BOUNCE_DETECTION
+	u32 cc_bounce_cnt;
+	ktime_t last_cc_change_time;
+	bool cc_bounce_detected;
+#endif /* CONFIG_CC_BOUNCE_DETECTION */
+#if defined(CONFIG_USB_FACTORY_MODE)
+/* [ALPS07177780] battery: factory higher sleep current by charger buck mode*/
+	bool ss_factory;
+#endif
 };
 
 #define to_tcpc_device(obj) container_of(obj, struct tcpc_device, dev)

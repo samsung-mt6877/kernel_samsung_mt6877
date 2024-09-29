@@ -46,10 +46,27 @@
 #define U3P_USBPHYACR0		0x000
 #define PA0_RG_U2PLL_FORCE_ON		BIT(15)
 #define PA0_RG_USB20_INTR_EN		BIT(5)
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+#define PA0_RG_USB20_INTR_EN_VAL(x)	((0x1 & (x)) << 5)
+#define PA0_RG_USB20_INTR_EN_MASK	(0x1)
+#define PA0_RG_USB20_INTR_EN_OFST	(5)
+
+#define PA0_RG_BGR_EN		BIT(0)
+#define PA0_RG_BGR_EN_VAL(x)	((0x1 & (x)) << 0)
+#define PA0_RG_BGR_EN_MASK	(0x1)
+#define PA0_RG_BGR_EN_OFST	(0)
+
+#define PA0_RG_MPX_OUT_SEL	GENMASK(30, 28)
+#define PA0_RG_MPX_OUT_SEL_VAL(x)	((0x3 & (x)) << 28)
+#define PA0_RG_MPX_OUT_SEL_MASK	(0x3)
+#define PA0_RG_MPX_OUT_SEL_OFST	(28)
+#endif
 
 #define U3P_USBPHYACR1		0x004
 #define PA1_RG_U2_INTR_CAL		GENMASK(23, 19)
 #define PA1_RG_U2_INTR_CAL_VAL(x)	((0x1f & (x)) << 19)
+#define PA1_RG_U2_INTR_CAL_MASK		(0x1f)
+#define PA1_RG_U2_INTR_CAL_OFST		(19)
 #define PA1_RG_VRT_SEL			GENMASK(14, 12)
 #define PA1_RG_VRT_SEL_VAL(x)	((0x7 & (x)) << 12)
 #define PA1_RG_VRT_SEL_MASK	(0x7)
@@ -64,8 +81,16 @@
 
 #define U3P_USBPHYACR5		0x014
 #define PA5_RG_U2_HSTX_SRCAL_EN	BIT(15)
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+#define PA5_RG_U2_HSTX_SRCAL_EN_VAL(x)	((0x1 & (x)) << 15)
+#define PA5_RG_U2_HSTX_SRCAL_EN_MASK	(0x1)
+#define PA5_RG_U2_HSTX_SRCAL_EN_OFST	(15)
+#endif
+
 #define PA5_RG_U2_HSTX_SRCTRL		GENMASK(14, 12)
 #define PA5_RG_U2_HSTX_SRCTRL_VAL(x)	((0x7 & (x)) << 12)
+#define PA5_RG_U2_HSTX_SRCTRL_MASK	  (0x7)
+#define PA5_RG_U2_HSTX_SRCTRL_OFST	  (12)
 #define PA5_RG_U2_HS_100U_U3_EN	BIT(11)
 
 #define U3P_USBPHYACR6		0x018
@@ -73,15 +98,11 @@
 #define PA6_RG_U2_PHY_REV6_VAL(x)	((0x3 & (x)) << 30)
 #define PA6_RG_U2_PHY_REV6_MASK	(0x3)
 #define PA6_RG_U2_PHY_REV6_OFET	(30)
-
-#if (!defined CONFIG_MACH_MT6781) && (!defined CONFIG_MACH_MT6768)
 #define PA6_RG_U2_PHY_REV4		BIT(28)
 #define PA6_RG_U2_PHY_REV4_VAL(x)	((0x1 & (x)) << 28)
 #define PA6_RG_U2_PHY_REV4_MASK	(0x1)
 #define PA6_RG_U2_PHY_REV4_OFET	(28)
 #define PA6_RG_U2_PHY_REV1		BIT(25)
-#endif
-
 #define PA6_RG_U2_BC11_SW_EN		BIT(23)
 #define PA6_RG_U2_OTG_VBUSCMP_EN	BIT(20)
 #define PA6_RG_U2_DISCTH	GENMASK(7, 4)
@@ -90,6 +111,8 @@
 #define PA6_RG_U2_DISCTH_OFET	(4)
 #define PA6_RG_U2_SQTH		GENMASK(3, 0)
 #define PA6_RG_U2_SQTH_VAL(x)	(0xf & (x))
+#define PA6_RG_U2_SQTH_MASK	(0xf)
+#define PA6_RG_U2_SQTH_OFST	(0)
 
 #define U3P_USBPHYACR3		0x01c
 #define PA3_RG_USB20_PUPD_BIST_EN	BIT(12)
@@ -340,19 +363,31 @@
 
 #define PHY_MODE_BC11_SW_SET 1
 #define PHY_MODE_BC11_SW_CLR 2
-
-#if (!defined CONFIG_MACH_MT6781) && (!defined CONFIG_MACH_MT6768)
 #define PHY_MODE_DPDMPULLDOWN_SET 3
 #define PHY_MODE_DPDMPULLDOWN_CLR 4
 #define PHY_MODE_DPPULLUP_SET 5
 #define PHY_MODE_DPPULLUP_CLR 6
-#endif
 
 #define PROC_FILE_TERM_SEL "term_sel"
 #define PROC_FILE_VRT_SEL "vrt_sel"
 #define PROC_FILE_PHY_REV6 "phy_rev6"
+#define PROC_FILE_PHY_REV4 "phy_rev4"
 #define PROC_FILE_DISCTH "discth"
+#define PROC_FILE_INTR_CAL "intr_cal"
+#define PROC_FILE_SQTH "sqth"
+#define PROC_FILE_HSTX_SRCTRL "hstx_srctrl"
 #define LOOPBACK_STR "loopback_test"
+
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+#define PROC_FILE_BGR_EN "bgr_en"
+#define PROC_FILE_INTR_EN "intr_en"
+#define PROC_FILE_MPX_OUT_SEL "mpx_out_sel"
+#define PROC_FILE_HSTX_SRCAL_EN "hstx_srcal_en"
+
+#ifdef CONFIG_ADB_PHY_TUNING
+bool phy_tuning_mode = false;
+#endif
+#endif
 
 enum mtk_phy_version {
 	MTK_PHY_V1 = 1,
@@ -406,7 +441,17 @@ struct mtk_phy_instance {
 	int eye_vrt;
 	int eye_term;
 	int eye_rev6;
+	int eye_rev4;
 	int eye_disc;
+	int eye_sqth;
+	int eye_intr_cal;
+	int eye_hstx_srctrl;
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	int eye_bgr_en;
+	int eye_intr_en;
+	int eye_mpx_out_sel;
+	int eye_hstx_srcal_en;
+#endif
 	bool bc12_en;
 	struct proc_dir_entry *phy_root;
 };
@@ -692,6 +737,11 @@ static ssize_t proc_term_sel_write(struct file *file,
 	tmp |= PA1_RG_TERM_SEL_VAL(val);
 	writel(tmp, com + U3P_USBPHYACR1);
 
+	
+#ifdef CONFIG_ADB_PHY_TUNING
+	phy_tuning_mode = true;
+#endif
+
 	return count;
 }
 
@@ -748,12 +798,77 @@ static ssize_t proc_vrt_sel_write(struct file *file,
 	tmp |= PA1_RG_VRT_SEL_VAL(val);
 	writel(tmp, com + U3P_USBPHYACR1);
 
+	
+#ifdef CONFIG_ADB_PHY_TUNING
+	phy_tuning_mode = true;
+#endif
+
 	return count;
 }
 
 static const struct file_operations proc_vrt_sel_fops = {
 	.open = proc_vrt_sel_open,
 	.write = proc_vrt_sel_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int proc_phy_rev4_show(struct seq_file *s, void *unused)
+{
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	u32 tmp;
+	char str[16];
+
+	tmp = readl(com + U3P_USBPHYACR6);
+	tmp >>= PA6_RG_U2_PHY_REV4_OFET;
+	tmp &= PA6_RG_U2_PHY_REV4_MASK;
+
+	cover_val_to_str(tmp, 1, str);
+
+	seq_printf(s, "\n%s = %s\n", PROC_FILE_PHY_REV4, str);
+	return 0;
+}
+
+static int proc_phy_rev4_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_phy_rev4_show, PDE_DATA(inode));
+}
+
+static ssize_t proc_phy_rev4_write(struct file *file,
+	const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	char buf[20];
+	u32 tmp, val;
+
+	memset(buf, 0x00, sizeof(buf));
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (kstrtouint(buf, 2, &val))
+		return -EINVAL;
+
+	tmp = readl(com + U3P_USBPHYACR6);
+	tmp &= ~PA6_RG_U2_PHY_REV4;
+	tmp |= PA6_RG_U2_PHY_REV4_VAL(val);
+	writel(tmp, com + U3P_USBPHYACR6);
+	
+#ifdef CONFIG_ADB_PHY_TUNING
+	phy_tuning_mode = true;
+#endif
+
+	return count;
+}
+
+static const struct file_operations proc_phy_rev4_fops = {
+	.open = proc_phy_rev4_open,
+	.write = proc_phy_rev4_write,
 	.read = seq_read,
 	.llseek = seq_lseek,
 	.release = single_release,
@@ -803,6 +918,10 @@ static ssize_t proc_phy_rev6_write(struct file *file,
 	tmp &= ~PA6_RG_U2_PHY_REV6;
 	tmp |= PA6_RG_U2_PHY_REV6_VAL(val);
 	writel(tmp, com + U3P_USBPHYACR6);
+	
+#ifdef CONFIG_ADB_PHY_TUNING
+	phy_tuning_mode = true;
+#endif
 
 	return count;
 }
@@ -859,6 +978,10 @@ static ssize_t proc_discth_write(struct file *file,
 	tmp &= ~PA6_RG_U2_DISCTH;
 	tmp |= PA6_RG_U2_DISCTH_VAL(val);
 	writel(tmp, com + U3P_USBPHYACR6);
+	
+#ifdef CONFIG_ADB_PHY_TUNING
+	phy_tuning_mode = true;
+#endif
 
 	return count;
 }
@@ -870,6 +993,417 @@ static const struct file_operations proc_discth_fops = {
 	.llseek = seq_lseek,
 	.release = single_release,
 };
+
+static int proc_intr_cal_show(struct seq_file *s, void *unused)
+{
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	u32 tmp;
+	char str[16];
+
+	tmp = readl(com + U3P_USBPHYACR1);
+	tmp >>= PA1_RG_U2_INTR_CAL_OFST;
+	tmp &= PA1_RG_U2_INTR_CAL_MASK;
+
+	cover_val_to_str(tmp, 5, str);
+
+	seq_printf(s, "\n%s = %s\n", PROC_FILE_INTR_CAL, str);
+	return 0;
+}
+
+static int proc_intr_cal_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_intr_cal_show, PDE_DATA(inode));
+}
+
+static ssize_t proc_intr_cal_write(struct file *file,
+	const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	char buf[20];
+	u32 tmp, val;
+
+	memset(buf, 0x00, sizeof(buf));
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (kstrtouint(buf, 2, &val))
+		return -EINVAL;
+
+	tmp = readl(com + U3P_USBPHYACR1);
+	tmp &= ~PA1_RG_U2_INTR_CAL;
+	tmp |= PA1_RG_U2_INTR_CAL_VAL(val);
+	writel(tmp, com + U3P_USBPHYACR1);
+	
+#ifdef CONFIG_ADB_PHY_TUNING
+	phy_tuning_mode = true;
+#endif
+
+	return count;
+}
+
+static const struct file_operations proc_intr_cal_fops = {
+	.open = proc_intr_cal_open,
+	.write = proc_intr_cal_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int proc_sqth_show(struct seq_file *s, void *unused)
+{
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	u32 tmp;
+	char str[16];
+
+	tmp = readl(com + U3P_USBPHYACR6);
+	tmp >>= PA6_RG_U2_SQTH_OFST;
+	tmp &= PA6_RG_U2_SQTH_MASK;
+	cover_val_to_str(tmp, 4, str);
+
+	seq_printf(s, "\n%s = %s\n", PROC_FILE_SQTH, str);
+	return 0;
+}
+
+static int proc_sqth_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_sqth_show, PDE_DATA(inode));
+}
+
+static ssize_t proc_sqth_write(struct file *file,
+	const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	char buf[20];
+	u32 tmp, val;
+
+	memset(buf, 0x00, sizeof(buf));
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (kstrtouint(buf, 2, &val))
+		return -EINVAL;
+
+	tmp = readl(com + U3P_USBPHYACR6);
+	tmp &= ~PA6_RG_U2_SQTH;
+	tmp |= PA6_RG_U2_SQTH_VAL(val);
+	writel(tmp, com + U3P_USBPHYACR6);
+	
+#ifdef CONFIG_ADB_PHY_TUNING
+	phy_tuning_mode = true;
+#endif
+
+	return count;
+}
+
+static const struct file_operations proc_sqth_fops = {
+	.open = proc_sqth_open,
+	.write = proc_sqth_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int proc_hstx_srctrl_show(struct seq_file *s, void *unused)
+{
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	u32 tmp;
+	char str[16];
+
+	tmp = readl(com + U3P_USBPHYACR5);
+	tmp >>= PA5_RG_U2_HSTX_SRCTRL_OFST;
+	tmp &= PA5_RG_U2_HSTX_SRCTRL_MASK;
+
+	cover_val_to_str(tmp, 3, str);
+
+	seq_printf(s, "\n%s = %s\n", PROC_FILE_HSTX_SRCTRL, str);
+	return 0;
+}
+
+static int proc_hstx_srctrl_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_hstx_srctrl_show, PDE_DATA(inode));
+}
+
+static ssize_t proc_hstx_srctrl_write(struct file *file,
+	const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	char buf[20];
+	u32 tmp, val;
+
+	memset(buf, 0x00, sizeof(buf));
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (kstrtouint(buf, 2, &val))
+		return -EINVAL;
+
+	tmp = readl(com + U3P_USBPHYACR5);
+	tmp &= ~PA5_RG_U2_HSTX_SRCTRL;
+	tmp |= PA5_RG_U2_HSTX_SRCTRL_VAL(val);
+	writel(tmp, com + U3P_USBPHYACR5);
+	
+#ifdef CONFIG_ADB_PHY_TUNING
+	phy_tuning_mode = true;
+#endif
+
+	return count;
+}
+
+static const struct file_operations proc_hstx_srctrl_fops = {
+	.open = proc_hstx_srctrl_open,
+	.write = proc_hstx_srctrl_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+#ifdef CONFIG_ADB_PHY_TUNING
+static int proc_bgr_en_show(struct seq_file *s, void *unused)
+{
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	u32 tmp;
+	char str[16];
+
+	tmp = readl(com + U3P_USBPHYACR0);
+	tmp >>= PA0_RG_BGR_EN_OFST;
+	tmp &= PA0_RG_BGR_EN_MASK;
+
+	cover_val_to_str(tmp, 1, str);
+
+	seq_printf(s, "\n%s = %s\n", PROC_FILE_BGR_EN, str);
+	return 0;
+}
+
+static int proc_bgr_en_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_bgr_en_show, PDE_DATA(inode));
+}
+
+static ssize_t proc_bgr_en_write(struct file *file,
+	const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	char buf[20];
+	u32 tmp, val;
+
+	memset(buf, 0x00, sizeof(buf));
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (kstrtouint(buf, 2, &val))
+		return -EINVAL;
+
+	tmp = readl(com + U3P_USBPHYACR0);
+	tmp &= ~PA0_RG_BGR_EN;
+	tmp |= PA0_RG_BGR_EN_VAL(val);
+	writel(tmp, com + U3P_USBPHYACR0);
+
+	return count;
+}
+
+static const struct file_operations proc_bgr_en_fops = {
+	.open = proc_bgr_en_open,
+	.write = proc_bgr_en_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int proc_intr_en_show(struct seq_file *s, void *unused)
+{
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	u32 tmp;
+	char str[16];
+
+	tmp = readl(com + U3P_USBPHYACR0);
+	tmp >>= PA0_RG_USB20_INTR_EN_OFST;
+	tmp &= PA0_RG_USB20_INTR_EN_MASK;
+
+	cover_val_to_str(tmp, 1, str);
+
+	seq_printf(s, "\n%s = %s\n", PROC_FILE_INTR_EN, str);
+	return 0;
+}
+
+static int proc_intr_en_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_intr_en_show, PDE_DATA(inode));
+}
+
+static ssize_t proc_intr_en_write(struct file *file,
+	const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	char buf[20];
+	u32 tmp, val;
+
+	memset(buf, 0x00, sizeof(buf));
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (kstrtouint(buf, 2, &val))
+		return -EINVAL;
+
+	tmp = readl(com + U3P_USBPHYACR0);
+	tmp &= ~PA0_RG_USB20_INTR_EN;
+	tmp |= PA0_RG_USB20_INTR_EN_VAL(val);
+	writel(tmp, com + U3P_USBPHYACR0);
+
+	phy_tuning_mode = true;
+
+	return count;
+}
+
+static const struct file_operations proc_intr_en_fops = {
+	.open = proc_intr_en_open,
+	.write = proc_intr_en_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int proc_mpx_out_sel_show(struct seq_file *s, void *unused)
+{
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	u32 tmp;
+	char str[16];
+
+	tmp = readl(com + U3P_USBPHYACR0);
+	tmp >>= PA0_RG_MPX_OUT_SEL_OFST;
+	tmp &= PA0_RG_MPX_OUT_SEL_MASK;
+
+	cover_val_to_str(tmp, 2, str);
+
+	seq_printf(s, "\n%s = %s\n", PROC_FILE_MPX_OUT_SEL, str);
+	return 0;
+}
+
+static int proc_mpx_out_sel_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_mpx_out_sel_show, PDE_DATA(inode));
+}
+
+static ssize_t proc_mpx_out_sel_write(struct file *file,
+	const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	char buf[20];
+	u32 tmp, val;
+
+	memset(buf, 0x00, sizeof(buf));
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (kstrtouint(buf, 2, &val))
+		return -EINVAL;
+
+	tmp = readl(com + U3P_USBPHYACR0);
+	tmp &= ~PA0_RG_MPX_OUT_SEL;
+	tmp |= PA0_RG_MPX_OUT_SEL_VAL(val);
+	writel(tmp, com + U3P_USBPHYACR0);
+
+	phy_tuning_mode = true;
+
+	return count;
+}
+
+static const struct file_operations proc_mpx_out_sel_fops = {
+	.open = proc_mpx_out_sel_open,
+	.write = proc_mpx_out_sel_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int proc_hstx_srcal_en_show(struct seq_file *s, void *unused)
+{
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	u32 tmp;
+	char str[16];
+
+	tmp = readl(com + U3P_USBPHYACR5);
+	tmp >>= PA5_RG_U2_HSTX_SRCAL_EN_OFST;
+	tmp &= PA5_RG_U2_HSTX_SRCAL_EN_MASK;
+
+	cover_val_to_str(tmp, 1, str);
+
+	seq_printf(s, "\n%s = %s\n", PROC_FILE_HSTX_SRCAL_EN, str);
+	return 0;
+}
+
+static int proc_hstx_srcal_en_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_hstx_srcal_en_show, PDE_DATA(inode));
+}
+
+static ssize_t proc_hstx_srcal_en_write(struct file *file,
+	const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *s = file->private_data;
+	struct mtk_phy_instance *instance = s->private;
+	struct u2phy_banks *u2_banks = &instance->u2_banks;
+	void __iomem *com = u2_banks->com;
+	char buf[20];
+	u32 tmp, val;
+
+	memset(buf, 0x00, sizeof(buf));
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (kstrtouint(buf, 2, &val))
+		return -EINVAL;
+
+	tmp = readl(com + U3P_USBPHYACR5);
+	tmp &= ~PA5_RG_U2_HSTX_SRCAL_EN;
+	tmp |= PA5_RG_U2_HSTX_SRCAL_EN_VAL(val);
+	writel(tmp, com + U3P_USBPHYACR5);
+
+	phy_tuning_mode = true;
+
+	return count;
+}
+
+static const struct file_operations proc_hstx_srcal_en_fops = {
+	.open = proc_hstx_srcal_en_open,
+	.write = proc_hstx_srcal_en_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+#endif
 
 static int u2_phy_procfs_init(struct mtk_tphy *tphy,
 			struct mtk_phy_instance *instance)
@@ -909,6 +1443,14 @@ static int u2_phy_procfs_init(struct mtk_tphy *tphy,
 		goto err1;
 	}
 
+	file = proc_create_data(PROC_FILE_PHY_REV4, 0644,
+			phy_root, &proc_phy_rev4_fops, instance);
+	if (!file) {
+		dev_info(dev, "failed to creat proc file: %s\n", PROC_FILE_PHY_REV4);
+		ret = -ENOMEM;
+		goto err1;
+	}
+
 	file = proc_create_data(PROC_FILE_PHY_REV6, 0644,
 			phy_root, &proc_phy_rev6_fops, instance);
 	if (!file) {
@@ -924,6 +1466,64 @@ static int u2_phy_procfs_init(struct mtk_tphy *tphy,
 		ret = -ENOMEM;
 		goto err1;
 	}
+
+	file = proc_create_data(PROC_FILE_INTR_CAL, 0644,
+			phy_root, &proc_intr_cal_fops, instance);
+	if (!file) {
+		dev_info(dev, "failed to creat proc file: %s\n", PROC_FILE_INTR_CAL);
+		ret = -ENOMEM;
+		goto err1;
+	}
+
+	file = proc_create_data(PROC_FILE_SQTH, 0644,
+			phy_root, &proc_sqth_fops, instance);
+	if (!file) {
+		dev_info(dev, "failed to creat proc file: %s\n", PROC_FILE_SQTH);
+		ret = -ENOMEM;
+		goto err1;
+	}
+
+	file = proc_create_data(PROC_FILE_HSTX_SRCTRL, 0644,
+			phy_root, &proc_hstx_srctrl_fops, instance);
+	if (!file) {
+		dev_info(dev, "failed to creat proc file: %s\n", PROC_FILE_HSTX_SRCTRL);
+		ret = -ENOMEM;
+		goto err1;
+	}
+
+#ifdef CONFIG_ADB_PHY_TUNING
+	file = proc_create_data(PROC_FILE_BGR_EN, 0644,
+			phy_root, &proc_bgr_en_fops, instance);
+	if (!file) {
+		dev_info(dev, "failed to creat proc file: %s\n", PROC_FILE_BGR_EN);
+		ret = -ENOMEM;
+		goto err1;
+	}
+
+	file = proc_create_data(PROC_FILE_INTR_EN, 0644,
+			phy_root, &proc_intr_en_fops, instance);
+	if (!file) {
+		dev_info(dev, "failed to creat proc file: %s\n", PROC_FILE_INTR_EN);
+		ret = -ENOMEM;
+		goto err1;
+	}
+
+	file = proc_create_data(PROC_FILE_MPX_OUT_SEL, 0644,
+			phy_root, &proc_mpx_out_sel_fops, instance);
+	if (!file) {
+		dev_info(dev, "failed to creat proc file: %s\n", PROC_FILE_MPX_OUT_SEL);
+		ret = -ENOMEM;
+		goto err1;
+	}
+
+	file = proc_create_data(PROC_FILE_HSTX_SRCAL_EN, 0644,
+			phy_root, &proc_hstx_srcal_en_fops, instance);
+	if (!file) {
+		dev_info(dev, "failed to creat proc file: %s\n", PROC_FILE_HSTX_SRCAL_EN);
+		ret = -ENOMEM;
+		goto err1;
+	}
+#endif
 
 	instance->phy_root = phy_root;
 	return 0;
@@ -1115,11 +1715,16 @@ static void hs_slew_rate_calibrate(struct mtk_tphy *tphy,
 	tmp &= ~PA5_RG_U2_HSTX_SRCTRL;
 	tmp |= PA5_RG_U2_HSTX_SRCTRL_VAL(calibration_val);
 	writel(tmp, com + U3P_USBPHYACR5);
-
-	/* disable USB ring oscillator */
-	tmp = readl(com + U3P_USBPHYACR5);
-	tmp &= ~PA5_RG_U2_HSTX_SRCAL_EN;
-	writel(tmp, com + U3P_USBPHYACR5);
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	if (instance->eye_hstx_srcal_en < 0) {
+#endif
+		/* disable USB ring oscillator */
+		tmp = readl(com + U3P_USBPHYACR5);
+		tmp &= ~PA5_RG_U2_HSTX_SRCAL_EN;
+		writel(tmp, com + U3P_USBPHYACR5);
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	}
+#endif
 }
 
 static void u3_phy_instance_init(struct mtk_tphy *tphy,
@@ -1232,10 +1837,10 @@ static void u2_phy_instance_init(struct mtk_tphy *tphy,
 	tmp = readl(com + U3P_USBPHYACR6);
 	tmp &= ~PA6_RG_U2_BC11_SW_EN;	/* DP/DM BC1.1 path Disable */
 	tmp &= ~PA6_RG_U2_SQTH;
-	tmp |= PA6_RG_U2_SQTH_VAL(2);
+	tmp |= PA6_RG_U2_SQTH_VAL(0);
 	writel(tmp, com + U3P_USBPHYACR6);
 
-	dev_dbg(tphy->dev, "%s(%d)\n", __func__, index);
+	dev_info(tphy->dev, "%s(%d)\n", __func__, index);
 }
 
 static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
@@ -1247,8 +1852,6 @@ static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
 	u32 tmp;
 
 	tmp = readl(com + U3P_U2PHYDTM0);
-
-#if (!defined CONFIG_MACH_MT6781) && (!defined CONFIG_MACH_MT6768)
 	tmp |= P2C_FORCE_SUSPENDM;
 	writel(tmp, com + U3P_U2PHYDTM0);
 
@@ -1287,15 +1890,12 @@ static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
 	writel(tmp, com + U3P_U2PHYDTM0);
 
 	tmp = readl(com + U3P_U2PHYDTM0);
-#endif
 	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
 	writel(tmp, com + U3P_U2PHYDTM0);
 
-#if (!defined CONFIG_MACH_MT6781) && (!defined CONFIG_MACH_MT6768)
 	tmp = readl(com + U3P_USBPHYACR6);
 	tmp &= ~PA6_RG_U2_BC11_SW_EN;
 	writel(tmp, com + U3P_USBPHYACR6);
-#endif
 
 	/* OTG Enable */
 	tmp = readl(com + U3P_USBPHYACR6);
@@ -1307,14 +1907,17 @@ static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
 	tmp &= ~P2C_RG_SESSEND;
 	writel(tmp, com + U3P_U2PHYDTM1);
 
-#if (!defined CONFIG_MACH_MT6781) && (!defined CONFIG_MACH_MT6768)
-	tmp = readl(com + U3P_USBPHYACR6);
-	tmp &= ~PA6_RG_U2_PHY_REV6;
-	tmp |= PA6_RG_U2_PHY_REV6_VAL(1);
-	writel(tmp, com + U3P_USBPHYACR6);
-
-	udelay(800);
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	if (instance->eye_rev6 < 0) {
 #endif
+		tmp = readl(com + U3P_USBPHYACR6);
+		tmp &= ~PA6_RG_U2_PHY_REV6;
+		tmp |= PA6_RG_U2_PHY_REV6_VAL(1);
+		writel(tmp, com + U3P_USBPHYACR6);
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	}
+#endif
+	udelay(800);
 
 	if (tphy->pdata->avoid_rx_sen_degradation && index) {
 		tmp = readl(com + U3D_U2PHYDCR0);
@@ -1326,18 +1929,19 @@ static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
 		writel(tmp, com + U3P_U2PHYDTM0);
 	}
 
-#if (defined CONFIG_MACH_MT6781) || (defined CONFIG_MACH_MT6768)
-	/* set SW_BC11_EN as 0 which is usb control DPDM */
-	u2_phy_instance_set_mode_ext(tphy, instance, PHY_MODE_BC11_SW_CLR);
-#endif
-
 #ifdef CONFIG_USB_MTK_HDRC
-	/* Used by phone products */
-	/* HQA Setting */
-	tmp = readl(com + U3P_USBPHYACR6);
-	tmp &= ~PA6_RG_U2_DISCTH;
-	tmp |= PA6_RG_U2_DISCTH_VAL(0xf);
-	writel(tmp, com + U3P_USBPHYACR6);
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	if (instance->eye_disc < 0) {
+#endif
+		/* Used by phone products */
+		/* HQA Setting */
+		tmp = readl(com + U3P_USBPHYACR6);
+		tmp &= ~PA6_RG_U2_DISCTH;
+		tmp |= PA6_RG_U2_DISCTH_VAL(0xf);
+		writel(tmp, com + U3P_USBPHYACR6);
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	}
+#endif
 #endif
 
 	dev_info(tphy->dev, "%s(%d)\n", __func__, index);
@@ -1352,20 +1956,9 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
 	u32 tmp;
 
 	tmp = readl(com + U3P_U2PHYDTM0);
-#if (defined CONFIG_MACH_MT6781) || (defined CONFIG_MACH_MT6768)
-	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN);
-	tmp |= P2C_RG_XCVRSEL_VAL(1) | P2C_DTM0_PART_MASK2;
-#if defined(CONFIG_MACH_MT6739)
-	dev_info(tphy->dev, "%s, write DTM0 SUSPENDM\n", __func__);
-	tmp |= P2C_RG_SUSPENDM;
-#endif
-#else
 	tmp &= ~(P2C_FORCE_UART_EN);
-#endif
-
 	writel(tmp, com + U3P_U2PHYDTM0);
 
-#if (!defined CONFIG_MACH_MT6781) && (!defined CONFIG_MACH_MT6768)
 	tmp = readl(com + U3P_U2PHYDTM1);
 	tmp &= ~P2C_RG_UART_EN;
 	writel(tmp, com + U3P_U2PHYDTM1);
@@ -1377,7 +1970,6 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
 	tmp = readl(com + U3P_USBPHYACR6);
 	tmp &= ~PA6_RG_U2_BC11_SW_EN;
 	writel(tmp, com + U3P_USBPHYACR6);
-#endif
 
 	/* OTG Disable */
 	tmp = readl(com + U3P_USBPHYACR6);
@@ -1389,7 +1981,6 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
 	tmp |= P2C_RG_SESSEND;
 	writel(tmp, com + U3P_U2PHYDTM1);
 
-#if (!defined CONFIG_MACH_MT6781) && (!defined CONFIG_MACH_MT6768)
 	tmp = readl(com + U3P_U2PHYDTM0);
 	tmp |= P2C_RG_SUSPENDM | P2C_FORCE_SUSPENDM;
 	writel(tmp, com + U3P_U2PHYDTM0);
@@ -1412,7 +2003,6 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
 	writel(tmp, com + U3P_U2PHYDTM0);
 
 	udelay(1);
-#endif
 
 	if (tphy->pdata->avoid_rx_sen_degradation && index) {
 		tmp = readl(com + U3P_U2PHYDTM0);
@@ -1424,13 +2014,6 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
 		writel(tmp, com + U3D_U2PHYDCR0);
 	}
 
-#if (defined CONFIG_MACH_MT6781) || (defined CONFIG_MACH_MT6768)
-	/*
-	 * set SW_BC11_EN as 0 which is charger control DPDM
-	 * to disable USB DPDM
-	 */
-	u2_phy_instance_set_mode_ext(tphy, instance, PHY_MODE_BC11_SW_SET);
-#endif
 	dev_info(tphy->dev, "%s(%d)\n", __func__, index);
 }
 
@@ -1547,13 +2130,32 @@ static int u2_phy_instance_get_mode_ext(struct mtk_tphy *tphy, struct mtk_phy_in
 		return PHY_MODE_USB_OTG;
 }
 
+static void u2_phy_set_default_value(struct mtk_phy_instance *instance)
+{
+	instance->eye_src = -1;
+	instance->eye_vrt = -1;
+	instance->eye_term = -1;
+	instance->eye_rev4 = -1;
+	instance->eye_rev6 = -1;
+	instance->eye_disc = -1;
+	instance->eye_sqth = -1;
+	instance->eye_intr_cal = -1;
+	instance->eye_hstx_srctrl = -1;
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	instance->eye_bgr_en = -1;
+	instance->eye_intr_en = -1;
+	instance->eye_mpx_out_sel = -1;
+	instance->eye_hstx_srcal_en = -1;
+#endif
+}
+
 static void u2_phy_instance_set_mode(struct mtk_tphy *tphy,
 				     struct mtk_phy_instance *instance,
 				     enum phy_mode mode)
 {
 	struct u2phy_banks *u2_banks = &instance->u2_banks;
 	struct device *dev = &instance->phy->dev;
-	u32 tmp;
+	u32 tmp, val;
 
 	tmp = readl(u2_banks->com + U3P_U2PHYDTM1);
 	switch (mode) {
@@ -1562,16 +2164,40 @@ static void u2_phy_instance_set_mode(struct mtk_tphy *tphy,
 		return;
 	case PHY_MODE_USB_DEVICE:
 		tmp |= P2C_FORCE_IDDIG | P2C_RG_IDDIG;
-		device_property_read_u32(dev, "mediatek,eye-src",
-				 &instance->eye_src);
-		device_property_read_u32(dev, "mediatek,eye-vrt",
-				 &instance->eye_vrt);
-		device_property_read_u32(dev, "mediatek,eye-term",
-				 &instance->eye_term);
-		device_property_read_u32(dev, "mediatek,eye-rev6",
-				 &instance->eye_rev6);
-		device_property_read_u32(dev, "mediatek,eye-disc",
-				 &instance->eye_disc);
+#ifdef CONFIG_USB_MTK_HDRC
+		/* Used by phone products */
+		tmp |= P2C_RG_VBUSVALID | P2C_RG_BVALID | P2C_RG_AVALID | P2C_RG_RG_IDPULLUP;
+		tmp &= ~P2C_RG_SESSEND;
+#endif
+		u2_phy_set_default_value(instance);
+		if(!device_property_read_u32(dev, "mediatek,eye-src", &val))
+			instance->eye_src = val;
+		if(!device_property_read_u32(dev, "mediatek,eye-vrt", &val))
+			instance->eye_vrt = val;
+		if(!device_property_read_u32(dev, "mediatek,eye-term", &val))
+			instance->eye_term = val;
+		if(!device_property_read_u32(dev, "mediatek,eye-rev4", &val))
+			instance->eye_rev4 = val;
+		if(!device_property_read_u32(dev, "mediatek,eye-rev6", &val))
+			instance->eye_rev6 = val;
+		if(!device_property_read_u32(dev, "mediatek,eye-disc", &val))
+			instance->eye_disc = val;
+		if(!device_property_read_u32(dev, "mediatek,eye-sqth", &val))
+			instance->eye_sqth = val;
+		if(!device_property_read_u32(dev, "mediatek,eye-intr_cal", &val))
+			instance->eye_intr_cal = val;
+		if(!device_property_read_u32(dev, "mediatek,eye-hstx_srctrl", &val))
+			instance->eye_hstx_srctrl = val;
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+		if(!device_property_read_u32(dev, "mediatek,eye-bgr_en", &val))
+			instance->eye_bgr_en = val;
+		if(!device_property_read_u32(dev, "mediatek,eye-intr_en", &val))
+			instance->eye_intr_en = val;
+		if(!device_property_read_u32(dev, "mediatek,eye-mpx_out_sel", &val))
+			instance->eye_mpx_out_sel = val;
+		if(!device_property_read_u32(dev, "mediatek,eye-hstx_srcal_en", &val))
+			instance->eye_hstx_srcal_en = val;
+#endif
 		u2_phy_props_set(tphy, instance);
 		break;
 	case PHY_MODE_USB_HOST:
@@ -1579,19 +2205,38 @@ static void u2_phy_instance_set_mode(struct mtk_tphy *tphy,
 		tmp &= ~P2C_RG_IDDIG;
 #ifdef	CONFIG_USB_MTK_HDRC
 		/* Used by phone products */
-		tmp |= P2C_RG_VBUSVALID | P2C_RG_BVALID | P2C_RG_AVALID;
+		tmp |= P2C_RG_VBUSVALID | P2C_RG_BVALID | P2C_RG_AVALID | P2C_RG_RG_IDPULLUP;
 		tmp &= ~P2C_RG_SESSEND;
 #endif
-		device_property_read_u32(dev, "mediatek,host-eye-src",
-				 &instance->eye_src);
-		device_property_read_u32(dev, "mediatek,host-eye-vrt",
-				 &instance->eye_vrt);
-		device_property_read_u32(dev, "mediatek,host-eye-term",
-				 &instance->eye_term);
-		device_property_read_u32(dev, "mediatek,host-eye-rev6",
-				 &instance->eye_rev6);
-		device_property_read_u32(dev, "mediatek,host-eye-disc",
-				 &instance->eye_disc);
+		u2_phy_set_default_value(instance);
+		if(!device_property_read_u32(dev, "mediatek,host-eye-src", &val))
+			instance->eye_src = val;
+		if(!device_property_read_u32(dev, "mediatek,host-eye-vrt", &val))
+			instance->eye_vrt = val;
+		if(!device_property_read_u32(dev, "mediatek,host-eye-term", &val))
+			instance->eye_term = val;
+		if(!device_property_read_u32(dev, "mediatek,host-eye-rev4", &val))
+			instance->eye_rev4 = val;
+		if(!device_property_read_u32(dev, "mediatek,host-eye-rev6", &val))
+			instance->eye_rev6 = val;
+		if(!device_property_read_u32(dev, "mediatek,host-eye-disc", &val))
+			instance->eye_disc = val;
+		if(!device_property_read_u32(dev, "mediatek,host-eye-sqth", &val))
+			instance->eye_sqth = val;
+		if(!device_property_read_u32(dev, "mediatek,host-eye-intr_cal", &val))
+			instance->eye_intr_cal = val;
+		if(!device_property_read_u32(dev, "mediatek,host-eye-hstx_srctrl", &val))
+			instance->eye_hstx_srctrl = val;
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+		if(!device_property_read_u32(dev, "mediatek,host-eye-bgr_en", &val))
+			instance->eye_bgr_en = val;
+		if(!device_property_read_u32(dev, "mediatek,host-eye-intr_en", &val))
+			instance->eye_intr_en = val;
+		if(!device_property_read_u32(dev, "mediatek,host-eye-mpx_out_sel", &val))
+			instance->eye_mpx_out_sel = val;
+		if(!device_property_read_u32(dev, "mediatek,host-eye-hstx_srcal_en", &val))
+			instance->eye_hstx_srcal_en = val;
+#endif
 		u2_phy_props_set(tphy, instance);
 		break;
 	case PHY_MODE_USB_OTG:
@@ -1636,8 +2281,6 @@ static void u2_phy_instance_set_mode_ext(struct mtk_tphy *tphy,
 		tmp &= ~PA6_RG_U2_BC11_SW_EN;
 		writel(tmp, u2_banks->com + U3P_USBPHYACR6);
 		break;
-
-#if (!defined CONFIG_MACH_MT6781) && (!defined CONFIG_MACH_MT6768)
 	case PHY_MODE_DPDMPULLDOWN_SET:
 		tmp = readl(u2_banks->com + U3P_U2PHYDTM0);
 		tmp |= P2C_RG_DPPULLDOWN | P2C_RG_DMPULLDOWN;
@@ -1676,7 +2319,6 @@ static void u2_phy_instance_set_mode_ext(struct mtk_tphy *tphy,
 			PA3_RG_USB20_EN_PU_DP);
 		writel(tmp, u2_banks->com + U3P_USBPHYACR3);
 		break;
-#endif
 	default:
 		return;
 	}
@@ -1941,25 +2583,53 @@ static void phy_parse_property(struct mtk_tphy *tphy,
 				struct mtk_phy_instance *instance)
 {
 	struct device *dev = &instance->phy->dev;
+	u32 val;
 
 	if (instance->type != PHY_TYPE_USB2)
 		return;
 
 	instance->bc12_en = device_property_read_bool(dev, "mediatek,bc12");
-	device_property_read_u32(dev, "mediatek,eye-src",
-				 &instance->eye_src);
-	device_property_read_u32(dev, "mediatek,eye-vrt",
-				 &instance->eye_vrt);
-	device_property_read_u32(dev, "mediatek,eye-term",
-				 &instance->eye_term);
-	device_property_read_u32(dev, "mediatek,eye-rev6",
-				 &instance->eye_rev6);
-	device_property_read_u32(dev, "mediatek,eye-disc",
-				 &instance->eye_disc);
-	dev_dbg(dev, "bc12:%d, src:%d, vrt:%d, term:%d, rev6:%d, disc:%d\n",
-		instance->bc12_en, instance->eye_src,
-		instance->eye_vrt, instance->eye_term,
-		instance->eye_rev6, instance->eye_disc);
+	u2_phy_set_default_value(instance);
+	if (!device_property_read_u32(dev, "mediatek,eye-src", &val))
+		instance->eye_src = val;
+	if (!device_property_read_u32(dev, "mediatek,eye-vrt", &val))
+		instance->eye_vrt = val;
+	if (!device_property_read_u32(dev, "mediatek,eye-term", &val))
+		instance->eye_term = val;
+	if (!device_property_read_u32(dev, "mediatek,eye-rev4", &val))
+		instance->eye_rev4 = val;
+	if (!device_property_read_u32(dev, "mediatek,eye-rev6", &val))
+		instance->eye_rev6 = val;
+	if (!device_property_read_u32(dev, "mediatek,eye-disc", &val))
+		instance->eye_disc = val;
+	if(!device_property_read_u32(dev, "mediatek,eye-sqth", &val))
+		instance->eye_sqth = val;
+	if(!device_property_read_u32(dev, "mediatek,eye-intr_cal", &val))
+		instance->eye_intr_cal = val;
+	if(!device_property_read_u32(dev, "mediatek,eye-hstx_srctrl", &val))
+		instance->eye_hstx_srctrl = val;
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	if(!device_property_read_u32(dev, "mediatek,eye-bgr_en", &val))
+		instance->eye_bgr_en = val;
+	if(!device_property_read_u32(dev, "mediatek,eye-intr_en", &val))
+		instance->eye_intr_en = val;
+	if(!device_property_read_u32(dev, "mediatek,eye-mpx_out_sel", &val))
+		instance->eye_mpx_out_sel = val;
+	if(!device_property_read_u32(dev, "mediatek,eye-hstx_srcal_en", &val))
+		instance->eye_hstx_srcal_en = val;
+#endif
+
+	dev_dbg(dev, "bc12:%d, src:%d, vrt:%d, term:%d, rev4:%d",
+		instance->bc12_en, instance->eye_src, instance->eye_vrt,
+		instance->eye_term,	instance->eye_rev4);
+	dev_dbg(dev, "rev6:%d, disc:%d, sqth:%d, intr_cal:%d, hstx_srctrl:$d\n",
+		instance->eye_rev6, instance->eye_disc,	instance->eye_sqth,
+		instance->eye_intr_cal, instance->eye_hstx_srctrl);
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	dev_dbg(dev, "bgr_en:%d, intr_en:%d, mpx_out_sel:%d, hstx_srcal_en:%d\n",
+		instance->eye_bgr_en, instance->eye_intr_en,
+		instance->eye_mpx_out_sel, instance->eye_hstx_srcal_en);
+#endif
 }
 
 static void u2_phy_props_set(struct mtk_tphy *tphy,
@@ -1970,10 +2640,21 @@ static void u2_phy_props_set(struct mtk_tphy *tphy,
 	struct device *dev = &instance->phy->dev;
 	u32 tmp;
 
-	dev_info(dev, "%s, bc12:%d, src:%d, vrt:%d, term:%d, rev6:%d, dis:%d",
+	dev_info(dev, "%s, bc12:%d, src:%d, vrt:%d, term:%d, rev4:%d",
 		__func__, instance->bc12_en, instance->eye_src,
-		instance->eye_vrt, instance->eye_term, instance->eye_rev6,
-		instance->eye_disc);
+		instance->eye_vrt, instance->eye_term, instance->eye_rev4);
+	dev_info(dev, "%s, rev6:%d, dis:%d sqth:%d intr_cal:%d hstx_srctrl:%d\n",
+		__func__, instance-> eye_rev6, instance->eye_disc,
+		instance->eye_sqth, instance->eye_intr_cal, instance->eye_hstx_srctrl);
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	dev_info(dev, "%s, bgr_en:%d, intr_en:%d, mpx_out_sel:%d, hstx_srcal_en:%d\n",
+		__func__, instance->eye_bgr_en, instance->eye_intr_en,
+		instance->eye_mpx_out_sel, instance->eye_hstx_srcal_en);
+#endif
+#ifdef CONFIG_ADB_PHY_TUNING
+	if (phy_tuning_mode == true)
+		return;
+#endif
 
 	if (instance->bc12_en) {
 		tmp = readl(com + U3P_U2PHYBC12C);
@@ -1981,41 +2662,97 @@ static void u2_phy_props_set(struct mtk_tphy *tphy,
 		writel(tmp, com + U3P_U2PHYBC12C);
 	}
 
-	if (instance->eye_src) {
+	if (instance->eye_src >= 0) {
 		tmp = readl(com + U3P_USBPHYACR5);
 		tmp &= ~PA5_RG_U2_HSTX_SRCTRL;
 		tmp |= PA5_RG_U2_HSTX_SRCTRL_VAL(instance->eye_src);
 		writel(tmp, com + U3P_USBPHYACR5);
 	}
 
-	if (instance->eye_vrt) {
+	if (instance->eye_vrt >= 0) {
 		tmp = readl(com + U3P_USBPHYACR1);
 		tmp &= ~PA1_RG_VRT_SEL;
 		tmp |= PA1_RG_VRT_SEL_VAL(instance->eye_vrt);
 		writel(tmp, com + U3P_USBPHYACR1);
 	}
 
-	if (instance->eye_term) {
+	if (instance->eye_term >= 0) {
 		tmp = readl(com + U3P_USBPHYACR1);
 		tmp &= ~PA1_RG_TERM_SEL;
 		tmp |= PA1_RG_TERM_SEL_VAL(instance->eye_term);
 		writel(tmp, com + U3P_USBPHYACR1);
 	}
 
-	if (instance->eye_rev6) {
+	if (instance->eye_rev4 >= 0) {
+		tmp = readl(com + U3P_USBPHYACR6);
+		tmp &= ~PA6_RG_U2_PHY_REV4;
+		tmp |= PA6_RG_U2_PHY_REV4_VAL(instance->eye_rev4);
+		writel(tmp, com + U3P_USBPHYACR6);
+	}
+
+	if (instance->eye_rev6 >= 0) {
 		tmp = readl(com + U3P_USBPHYACR6);
 		tmp &= ~PA6_RG_U2_PHY_REV6;
 		tmp |= PA6_RG_U2_PHY_REV6_VAL(instance->eye_rev6);
 		writel(tmp, com + U3P_USBPHYACR6);
 	}
 
-	if (instance->eye_disc) {
+	if (instance->eye_disc >= 0) {
 		tmp = readl(com + U3P_USBPHYACR6);
 		tmp &= ~PA6_RG_U2_DISCTH;
 		tmp |= PA6_RG_U2_DISCTH_VAL(instance->eye_disc);
 		writel(tmp, com + U3P_USBPHYACR6);
 	}
 
+	if (instance->eye_sqth >= 0) {
+		tmp = readl(com + U3P_USBPHYACR6);
+		tmp &= ~PA6_RG_U2_SQTH;
+		tmp |= PA6_RG_U2_SQTH_VAL(instance->eye_sqth);
+		writel(tmp, com + U3P_USBPHYACR6);
+	}
+
+	if (instance->eye_intr_cal >= 0) {
+		tmp = readl(com + U3P_USBPHYACR1);
+		tmp &= ~PA1_RG_U2_INTR_CAL;
+		tmp |= PA1_RG_U2_INTR_CAL_VAL(instance->eye_intr_cal);
+		writel(tmp, com + U3P_USBPHYACR1);
+	}
+
+	if (instance->eye_hstx_srctrl >= 0) {
+		tmp = readl(com + U3P_USBPHYACR5);
+		tmp &= ~PA5_RG_U2_HSTX_SRCTRL;
+		tmp |= PA5_RG_U2_HSTX_SRCTRL_VAL(instance->eye_hstx_srctrl);
+		writel(tmp, com + U3P_USBPHYACR5);
+	}
+#ifdef CONFIG_SAMSUNG_PHY_TUNE
+	if (instance->eye_bgr_en >= 0) {
+		tmp = readl(com + U3P_USBPHYACR0);
+		tmp &= ~PA0_RG_BGR_EN;
+		tmp |= PA0_RG_BGR_EN_VAL(instance->eye_bgr_en);
+		writel(tmp, com + U3P_USBPHYACR0);
+	}
+
+	if (instance->eye_intr_en >= 0) {
+		tmp = readl(com + U3P_USBPHYACR0);
+		tmp &= ~PA0_RG_USB20_INTR_EN;
+		tmp |= PA0_RG_USB20_INTR_EN_VAL(instance->eye_intr_en);
+		writel(tmp, com + U3P_USBPHYACR0);
+	}
+
+	if (instance->eye_mpx_out_sel >= 0) {
+		tmp = readl(com + U3P_USBPHYACR0);
+		tmp &= ~PA0_RG_MPX_OUT_SEL;
+		tmp |= PA0_RG_MPX_OUT_SEL_VAL(instance->eye_mpx_out_sel);
+		writel(tmp, com + U3P_USBPHYACR0);
+	}
+
+	if (instance->eye_hstx_srcal_en >= 0) {
+		tmp = readl(com + U3P_USBPHYACR5);
+		tmp &= ~PA5_RG_U2_HSTX_SRCAL_EN;
+		tmp |= PA5_RG_U2_HSTX_SRCAL_EN_VAL(instance->eye_hstx_srcal_en);
+		writel(tmp, com + U3P_USBPHYACR5);
+	}
+#endif
 #ifdef CONFIG_MACH_MT6771
 	if ((tphy->phys[0] == instance) && (instance->type == PHY_TYPE_USB2))
 		bc11_instance = instance;

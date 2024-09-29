@@ -608,6 +608,20 @@ static int get_hw_btsmdpa_temp(void)
 	int ret = 0, data[4], i, ret_value = 0, ret_temp = 0, output;
 	int times = 1, Channel = g_RAP_ADC_channel; /* 6752=0(AUX_IN1_NTC) */
 	static int valid_temp;
+	#if defined(APPLY_AUXADC_CALI_DATA)
+	int auxadc_cali_temp;
+	#endif
+#endif
+#ifdef CONFIG_OF
+	struct device_node *dev_node;
+
+	dev_node = of_find_compatible_node(NULL, NULL, "mediatek,mtboard-thermistor1");
+	if (dev_node) {
+		if (of_property_read_bool(dev_node, "fixed_thermal")) {
+			mtkts_btsmdpa_dprintk("[%s] Bypass thermal check\n", __func__);
+			return 40;
+		}
+	}
 #endif
 
 #if defined(CONFIG_MEDIATEK_MT6577_AUXADC)
@@ -629,11 +643,6 @@ static int get_hw_btsmdpa_temp(void)
 	ret = val;
 #endif
 #else
-
-#if defined(APPLY_AUXADC_CALI_DATA)
-	int auxadc_cali_temp;
-#endif
-
 	if (IMM_IsAdcInitReady() == 0) {
 		mtkts_btsmdpa_printk(
 			"[thermal_auxadc_get_data]: AUXADC is not ready\n");
@@ -747,8 +756,10 @@ int mtkts_btsmdpa_get_hw_temp(void)
 
 	mutex_unlock(&BTSMDPA_lock);
 
+#ifndef CONFIG_SEC_PM
 	if (t_ret > 40000)	/* abnormal high temp */
 		mtkts_btsmdpa_printk("T_btsmdpa=%d\n", t_ret);
+#endif
 
 	mtkts_btsmdpa_dprintk("[%s] T_btsmdpa, %d\n", __func__,
 									t_ret);

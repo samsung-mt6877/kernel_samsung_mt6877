@@ -66,6 +66,57 @@ struct tag_bootmode {
 	u32 boottype;
 };
 
+#if defined(CONFIG_BATTERY_SAMSUNG)
+static int mtk_switch_chr_pdc_run(struct charger_manager *info)
+{
+	int ret = 0;
+	/* Call MTK charger and sec_battery for MTK pd properties */
+	ret = pdc_run();
+	pr_info("%s: ret: %d\n", __func__, ret);
+
+	return 0;
+}
+
+static int mtk_switch_chr_cc(struct charger_manager *info)
+{
+	struct switch_charging_alg_data *swchgalg = info->algorithm_data;
+
+	if (pdc_is_ready() && !info->leave_pdc) {
+		if (info->enable_hv_charging == true) {
+			chr_err("%s: enter PDC!\n", __func__);
+			swchgalg->state = CHR_PDC;
+			return 1;
+		}
+	} else {
+		pr_info("%s: pdc_is_ready:%d leave_pdc:%d, enable_hv_charging:%d\n",
+			__func__, pdc_is_ready(), info->leave_pdc,
+			info->enable_hv_charging);
+	}
+
+	return 0;
+}
+
+static int mtk_switch_charging_run(struct charger_manager *info)
+{
+	struct switch_charging_alg_data *swchgalg = info->algorithm_data;
+	int ret = 0;
+
+	pr_info("%s: %d, %d\n", __func__, swchgalg->state, info->pd_type);
+
+	do {
+		switch (swchgalg->state) {
+		case CHR_CC:
+			ret = mtk_switch_chr_cc(info);
+			break;
+		case CHR_PDC:
+			ret = mtk_switch_chr_pdc_run(info);
+			break;
+	}
+	} while (ret != 0);
+
+	return 0;
+}
+#else
 static int _uA_to_mA(int uA)
 {
 	if (uA == -1)
@@ -424,41 +475,6 @@ static void swchg_turn_on_charging(struct charger_manager *info)
 	charger_dev_enable(info->chg1_dev, charging_enable);
 }
 
-static int mtk_switch_charging_plug_in(struct charger_manager *info)
-{
-	struct switch_charging_alg_data *swchgalg = info->algorithm_data;
-
-	swchgalg->state = CHR_CC;
-	info->polling_interval = CHARGING_INTERVAL;
-	swchgalg->disable_charging = false;
-	get_monotonic_boottime(&swchgalg->charging_begin_time);
-
-	return 0;
-}
-
-static int mtk_switch_charging_plug_out(struct charger_manager *info)
-{
-	struct switch_charging_alg_data *swchgalg = info->algorithm_data;
-
-	swchgalg->total_charging_time = 0;
-
-	mtk_pe20_set_is_cable_out_occur(info, true);
-	mtk_pe_set_is_cable_out_occur(info, true);
-	mtk_pdc_plugout(info);
-
-	if (info->enable_pe_5)
-		pe50_stop();
-
-	if (info->enable_pe_4)
-		pe40_stop();
-
-	info->leave_pe5 = false;
-	info->leave_pe4 = false;
-	info->leave_pdc = false;
-
-	return 0;
-}
-
 static int mtk_switch_charging_do_charging(struct charger_manager *info,
 						bool en)
 {
@@ -656,7 +672,42 @@ retry:
 
 	return 0;
 }
+#endif
 
+static int mtk_switch_charging_plug_in(struct charger_manager *info)
+{
+	struct switch_charging_alg_data *swchgalg = info->algorithm_data;
+
+	swchgalg->state = CHR_CC;
+	info->polling_interval = CHARGING_INTERVAL;
+	swchgalg->disable_charging = false;
+	get_monotonic_boottime(&swchgalg->charging_begin_time);
+
+	return 0;
+}
+
+static int mtk_switch_charging_plug_out(struct charger_manager *info)
+{
+	struct switch_charging_alg_data *swchgalg = info->algorithm_data;
+
+	swchgalg->total_charging_time = 0;
+
+	mtk_pe20_set_is_cable_out_occur(info, true);
+	mtk_pe_set_is_cable_out_occur(info, true);
+	mtk_pdc_plugout(info);
+
+	if (info->enable_pe_5)
+		pe50_stop();
+
+	if (info->enable_pe_4)
+		pe40_stop();
+
+	info->leave_pe5 = false;
+	info->leave_pe4 = false;
+	info->leave_pdc = false;
+
+	return 0;
+}
 
 static int mtk_switch_chr_pdc_init(struct charger_manager *info)
 {
@@ -672,6 +723,7 @@ static int mtk_switch_chr_pdc_init(struct charger_manager *info)
 	return 0;
 }
 
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 static int select_pdc_charging_current_limit(struct charger_manager *info)
 {
 	struct charger_data *pdata;
@@ -1084,6 +1136,7 @@ static int dvchg2_dev_event(struct notifier_block *nb, unsigned long event,
 
 	return mtk_pe50_notifier_call(info, MTK_PE50_NOTISRC_CHG, event, data);
 }
+#endif
 
 int mtk_switch_charging_init2(struct charger_manager *info)
 {
@@ -1101,6 +1154,7 @@ int mtk_switch_charging_init2(struct charger_manager *info)
 	else
 		chr_err("*** Error : can't find primary charger ***\n");
 
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 	info->dvchg1_dev = get_charger_by_name("primary_divider_chg");
 	if (info->dvchg1_dev) {
 		chr_err("Found primary divider charger [%s]\n",
@@ -1119,6 +1173,7 @@ int mtk_switch_charging_init2(struct charger_manager *info)
 						 &info->dvchg2_nb);
 	} else
 		chr_err("Can't find secondary divider charger\n");
+#endif
 
 	mutex_init(&swch_alg->ichg_aicr_access_mutex);
 
@@ -1126,12 +1181,20 @@ int mtk_switch_charging_init2(struct charger_manager *info)
 	info->do_algorithm = mtk_switch_charging_run;
 	info->plug_in = mtk_switch_charging_plug_in;
 	info->plug_out = mtk_switch_charging_plug_out;
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	info->do_charging = NULL;
+	info->do_event = NULL;
+	info->change_current_setting = NULL;
+#else
 	info->do_charging = mtk_switch_charging_do_charging;
 	info->do_event = charger_dev_event;
 	info->change_current_setting = mtk_switch_charging_current;
+#endif
 
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 	mtk_switch_chr_pe50_init(info);
 	mtk_switch_chr_pe40_init(info);
+#endif
 	mtk_switch_chr_pdc_init(info);
 
 	return 0;

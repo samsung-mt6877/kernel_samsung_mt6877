@@ -233,6 +233,13 @@ void low_battery_protect_init(void)
 		, POWER_INT1_VOLT, POWER_INT2_VOLT);
 }
 
+#if defined(CONFIG_USB_FACTORY_MODE)
+void set_g_low_battery_stop(int val)
+{
+	g_low_battery_stop = val;
+}
+#endif
+
 int dlpt_check_power_off(void)
 {
 	int ret = 0;
@@ -2005,10 +2012,18 @@ int pmic_throttling_dlpt_init(struct platform_device *pdev)
 #if (CONFIG_MTK_GAUGE_VERSION == 30)
 	struct device_node *np;
 	u32 val = 0;
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 	char *path;
+#endif
 
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	np = of_find_node_by_name(NULL, "mtk_battery");
+	if (!np)
+		pr_err("%s np NULL(mtk_battery)\n", __func__);
+#else
 	path = "/battery";
 	np = of_find_node_by_path(path);
+#endif
 	if (of_property_read_u32(np, "CAR_TUNE_VALUE", &val) == 0) {
 		fg_cust_data.car_tune_value = (int)val*10;
 		pr_info("Get car_tune_value from DT: %d\n"

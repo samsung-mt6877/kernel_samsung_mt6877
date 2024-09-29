@@ -257,6 +257,10 @@ static int mtkfb_blank(int blank_mode, struct fb_info *info)
 {
 	enum mtkfb_power_mode prev_pm = primary_display_get_power_mode();
 
+#if defined(CONFIG_SMCDSD_PANEL)
+	pr_info("%s + blank_mode: %d, %s\n",
+			__func__, blank_mode, blank_mode == FB_BLANK_UNBLANK ? "UNBLANK" : "POWERDOWN");
+#endif
 	switch (blank_mode) {
 	case FB_BLANK_UNBLANK:
 	case FB_BLANK_NORMAL:
@@ -292,6 +296,10 @@ static int mtkfb_blank(int blank_mode, struct fb_info *info)
 	default:
 		return -EINVAL;
 	}
+
+#if defined(CONFIG_SMCDSD_PANEL)
+	pr_info("%s - blank_mode: %d\n", __func__, blank_mode);
+#endif
 
 	return 0;
 }
@@ -1002,7 +1010,7 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd,
 	unsigned long arg)
 {
 	void __user *argp = (void __user *)arg;
-	int ret = 0;
+	enum DISP_STATUS ret = 0;
 	int r = 0;
 
 	DISPFUNC();
@@ -2568,6 +2576,35 @@ static int mtkfb_resume(struct platform_device *pdev)
 	return 0;
 }
 
+#if defined(CONFIG_SMCDSD_PANEL)
+static void mtkfb_shutdown(struct platform_device *pdev)
+{
+	struct mtkfb_device *fbdev = dev_get_drvdata(&pdev->dev);
+
+	MTKFB_LOG("[FB Driver] mtkfb_shutdown()\n");
+	pr_info("%s: ++\n", __func__);
+
+	if (!lock_fb_info((fbdev->fb_info))) {
+		MTKFB_LOG("%s: fblock is failed\n", __func__);
+		return;
+	}
+
+	if (primary_display_is_sleepd()) {
+		MTKFB_LOG("mtkfb has been power off\n");
+		unlock_fb_info(fbdev->fb_info);
+		return;
+	}
+	smcdsd_simple_notifier_call_chain(FB_EARLY_EVENT_BLANK, FB_BLANK_POWERDOWN);
+	primary_display_set_power_mode(FB_SUSPEND);
+	primary_display_suspend();
+
+	smcdsd_simple_notifier_call_chain(FB_EVENT_BLANK, FB_BLANK_POWERDOWN);
+	unlock_fb_info(fbdev->fb_info);
+
+	MTKFB_LOG("[FB Driver] leave mtkfb_shutdown\n");
+	pr_info("%s: --\n", __func__);
+}
+#else
 static void mtkfb_shutdown(struct platform_device *pdev)
 {
 	MTKFB_LOG("[FB Driver] mtkfb_shutdown()\n");
@@ -2585,6 +2622,7 @@ static void mtkfb_shutdown(struct platform_device *pdev)
 	primary_display_suspend();
 	MTKFB_LOG("[FB Driver] leave mtkfb_shutdown\n");
 }
+#endif
 
 bool mtkfb_is_suspend(void)
 {

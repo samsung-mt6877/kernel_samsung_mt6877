@@ -125,7 +125,7 @@ static const struct mtk_spi_compatible mt2712_compat = {
 };
 
 static const struct mtk_spi_compatible mt6765_compat = {
-	.need_pad_sel = true,
+	.need_pad_sel = false,
 	.must_tx = true,
 	.enhance_timing = true,
 	.dma_ext = true,
@@ -783,6 +783,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
 	const struct of_device_id *of_id;
 	struct resource *res;
 	int i, irq, ret, addr_bits, value;
+	u32 num_cs = 0;
+	u32 max_dma = 0;
 
 	master = spi_alloc_master(&pdev->dev, sizeof(*mdata));
 	if (!master) {
@@ -794,6 +796,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
 	master->dev.of_node = pdev->dev.of_node;
 	master->mode_bits = SPI_CPOL | SPI_CPHA | SPI_LSB_FIRST;
 
+	master->set_cs = mtk_spi_set_cs;
 	master->prepare_message = mtk_spi_prepare_message;
 	master->transfer_one = mtk_spi_transfer_one;
 	master->can_dma = mtk_spi_can_dma;
@@ -805,6 +808,9 @@ static int mtk_spi_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err_put_master;
 	}
+
+	if (!of_property_read_u32(pdev->dev.of_node, "num-cs", &num_cs))
+		master->num_chipselect = num_cs;
 
 	mdata = spi_master_get_devdata(master);
 	mdata->dev_comp = of_id->data;
@@ -860,6 +866,20 @@ static int mtk_spi_probe(struct platform_device *pdev)
 				goto err_put_master;
 			}
 		}
+	}
+	
+
+	if (!of_property_read_u32(pdev->dev.of_node, "max-dma", &max_dma)) {
+		if(max_dma > SZ_256K)
+			max_dma = SZ_256K;
+
+		if(!pdev->dev.dma_parms)
+			pdev->dev.dma_parms = kzalloc(sizeof(pdev->dev.dma_parms), GFP_KERNEL);
+
+		ret = dma_set_max_seg_size(&pdev->dev, max_dma);
+
+		spi_debug("max_dma size is changed to 0x%x\n",
+				dma_get_max_seg_size(&pdev->dev));
 	}
 
 	pm_qos_add_request(&mdata->spi_qos_request, PM_QOS_CPU_DMA_LATENCY,
@@ -955,6 +975,7 @@ static int mtk_spi_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "failed to register master (%d)\n", ret);
 		goto err_disable_runtime_pm;
 	}
+	pr_info("num_chipselect=%d\n", master->num_chipselect);
 
 	if (mdata->dev_comp->need_pad_sel) {
 		if (mdata->pad_num != master->num_chipselect) {
@@ -995,6 +1016,8 @@ static int mtk_spi_probe(struct platform_device *pdev)
 	if (ret)
 		dev_notice(&pdev->dev, "SPI sysfs_create_file fail, ret:%d\n",
 			ret);
+
+	pr_info("num_chipselect=%d\n", master->num_chipselect);
 
 	ret = dma_set_mask(&pdev->dev, DMA_BIT_MASK(addr_bits));
 	if (ret)
@@ -1126,6 +1149,51 @@ static int mtk_spi_runtime_resume(struct device *dev)
 	return 0;
 }
 #endif /* CONFIG_PM */
+
+#ifdef CONFIG_SAMSUNG_TUI
+int stui_spi_lock(struct spi_master *spi)
+{
+	int ret = 0;
+	struct mtk_spi *mdata = spi_master_get_devdata(spi);
+
+	(void)mdata;
+
+	spi_bus_lock(spi);
+
+	pr_info("STUI stui_spi_lock() enter\n");
+
+#ifdef CONFIG_PM
+	ret = clk_enable(mdata->spi_clk);
+	if (ret < 0) {
+		pr_err("STUI failed to enable spi_clk (%d)\n", ret);
+		spi_bus_unlock(spi);
+		return ret;
+	}
+#endif
+	pr_info("STUI stui_spi_lock() exit\n");
+	return ret;
+}
+
+int stui_spi_unlock(struct spi_master *spi)
+{
+	int ret = 0;
+	struct mtk_spi *mdata;
+
+	(void)mdata;
+
+	pr_info("STUI stui_spi_unlock() enter\n");
+
+#ifdef CONFIG_PM
+	mdata = spi_master_get_devdata(spi);
+	clk_disable(mdata->spi_clk);
+#endif
+
+	spi_bus_unlock(spi);
+
+	pr_info("STUI stui_spi_unlock() exit\n");
+	return 0;
+}
+#endif
 
 static const struct dev_pm_ops mtk_spi_pm = {
 	SET_SYSTEM_SLEEP_PM_OPS(mtk_spi_suspend, mtk_spi_resume)

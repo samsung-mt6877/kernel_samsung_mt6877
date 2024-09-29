@@ -42,6 +42,7 @@
 #include <mmc/core/host.h>
 #include <mmc/core/queue.h>
 #include <mmc/core/mmc_ops.h>
+#include "mmc-sec-sysfs.h"
 
 #ifdef MTK_MSDC_BRINGUP_DEBUG
 //#include <mach/mt_pmic_wrap.h>
@@ -696,11 +697,9 @@ static void msdc_set_busy_timeout_ms(struct msdc_host *host, u32 ms)
 	}
 	MSDC_SET_FIELD(SDC_CFG, SDC_CFG_WRDTOC, (u32)timeout);
 
-	N_MSG(OPS, "Set CMD%d busy tmo: %dms(%d x1M cycles), freq=%dKHz\n",
-		host->cmd->opcode,
+	N_MSG(OPS, "Set busy tmo: %dms(%d x1M cycles), freq=%dKHz\n",
 		(ms > host->max_busy_timeout_ms) ? host->max_busy_timeout_ms :
-		ms,
-		(u32)timeout + 1, (host->sclk / 1000));
+		ms, (u32)timeout + 1, (host->sclk / 1000));
 }
 
 static void msdc_set_timeout(struct msdc_host *host, u32 ns, u32 clks)
@@ -1106,7 +1105,7 @@ int msdc_switch_part(struct msdc_host *host, char part_id)
 	if (ret)
 		return ret;
 
-	if (part_id != (l_buf[EXT_CSD_PART_CONFIG] & 0x7)) {
+	if ((part_id >= 0) && (part_id != (l_buf[EXT_CSD_PART_CONFIG] & 0x7))) {
 		l_buf[EXT_CSD_PART_CONFIG] &= ~0x7;
 		l_buf[EXT_CSD_PART_CONFIG] |= (part_id & 0x7);
 		ret = mmc_switch(host->mmc->card, 0, EXT_CSD_PART_CONFIG,
@@ -4670,6 +4669,8 @@ skip:
 			 * if data CRC error
 			 */
 			mrq->cmd->error = (unsigned int)-EILSEQ;
+			pr_err("%s: <%s> saved intsts: 0x%08x\n",
+				mmc_hostname(host->mmc), __func__, host->intsts);
 		} else {
 			dbg_add_host_log(host->mmc, 3, 0, 0);
 			msdc_dma_clear(host);
@@ -4963,6 +4964,14 @@ static void msdc_dvfs_kickoff(struct work_struct *work)
 {
 }
 
+int mmc_get_cd_level(struct mmc_host *mmc)
+{
+	struct msdc_host *host = mmc_priv(mmc);
+	
+	return host->hw->cd_level;
+}
+EXPORT_SYMBOL(mmc_get_cd_level);
+
 static int msdc_drv_probe(struct platform_device *pdev)
 {
 	struct mmc_host *mmc = NULL;
@@ -5000,17 +5009,20 @@ static int msdc_drv_probe(struct platform_device *pdev)
 		mmc->f_min = HOST_MIN_MCLK;
 	if (!mmc->f_max)
 		mmc->f_max = HOST_MAX_MCLK;
+	if (host->hw->host_function == MSDC_SD)
+		mmc->trigger_card_event = true;
 
 	if ((hw->flags & MSDC_SDIO_IRQ) || (hw->flags & MSDC_EXT_SDIO_IRQ))
 		mmc->caps |= MMC_CAP_SDIO_IRQ;  /* yes for sdio */
 #ifdef MTK_MSDC_USE_CMD23
-	if (host->hw->host_function == MSDC_EMMC)
-		mmc->caps |= MMC_CAP_CMD23;
+	mmc->caps |= MMC_CAP_CMD23;
 #endif
-	if (host->hw->host_function == MSDC_SD)
-		mmc->caps |= MMC_CAP_AGGRESSIVE_PM;
+//	if (host->hw->host_function == MSDC_SD)
+//		mmc->caps |= MMC_CAP_AGGRESSIVE_PM;
 
 	mmc->caps |= MMC_CAP_ERASE;
+	if (host->hw->host_function == MSDC_SD)
+		mmc->caps2 |= MMC_CAP2_NO_PRESCAN_POWERUP;
 
 #ifdef CONFIG_MTK_EMMC_CQ_SUPPORT
 	if (host->hw->host_function == MSDC_EMMC)
@@ -5022,7 +5034,10 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	 * R1B will change to R1, host will not detect DAT0 busy,
 	 * next CMD may send to eMMC at busy state.
 	 */
-	mmc->max_busy_timeout = 0;
+	if (host->id == 0)
+		mmc->max_busy_timeout = 0;
+	else if (host->id == 1)
+		mmc->max_busy_timeout = SD_ERASE_TIMEOUT_MS;
 
 	/* MMC core transfer sizes tunable parameters */
 	mmc->max_segs = MAX_HW_SGMTS;
@@ -5059,7 +5074,8 @@ static int msdc_drv_probe(struct platform_device *pdev)
 		host->mmc->caps & MMC_CAP_NONREMOVABLE ? 1 : 0;
 	host->timeout_clks = DEFAULT_DTOC * 1048576;
 
-	if (host->hw->host_function == MSDC_EMMC) {
+	if (host->hw->host_function == MSDC_EMMC ||
+			host->hw->host_function == MSDC_SD) {
 #ifdef MTK_MSDC_USE_CMD23
 		host->autocmd &= ~MSDC_AUTOCMD12;
 #if (MSDC_USE_AUTO_CMD23 == 1)
@@ -5068,8 +5084,6 @@ static int msdc_drv_probe(struct platform_device *pdev)
 #else
 		host->autocmd |= MSDC_AUTOCMD12;
 #endif
-	} else if (host->hw->host_function == MSDC_SD) {
-		host->autocmd |= MSDC_AUTOCMD12;
 	} else {
 		host->autocmd &= ~MSDC_AUTOCMD12;
 	}
@@ -5187,6 +5201,8 @@ static int msdc_drv_probe(struct platform_device *pdev)
 
 	if (host->hw->host_function == MSDC_EMMC)
 		msdc_debug_proc_init_bootdevice();
+	
+	mmc_sec_init_sysfs(mmc);
 
 	return 0;
 

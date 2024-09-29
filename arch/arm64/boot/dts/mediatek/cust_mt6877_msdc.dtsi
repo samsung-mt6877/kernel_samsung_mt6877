@@ -166,8 +166,8 @@
 		};
 
 		pins_insert {
-			pinmux = <PINMUX_GPIO3__FUNC_GPIO3>;
-			bias-pull-up;
+			pinmux = <PINMUX_GPIO9__FUNC_GPIO9>;
+			bias-disable;
 		};
 	};
 
@@ -201,6 +201,7 @@
 
 		pins_clk {
 			pinmux = <PINMUX_GPIO165__FUNC_MSDC1_CLK>;
+			input-enable;
 			drive-strength = <3>;
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
 		};

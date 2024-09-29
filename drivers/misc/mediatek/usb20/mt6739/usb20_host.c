@@ -234,7 +234,11 @@ void mt_usb_host_disconnect(int delay)
 }
 EXPORT_SYMBOL(mt_usb_host_disconnect);
 
+#if defined(CONFIG_CABLE_TYPE_NOTIFIER)
+bool musb_is_host(void)
+#else
 static bool musb_is_host(void)
+#endif
 {
 	bool host_mode = 0;
 
@@ -360,6 +364,19 @@ static void do_host_plug_test_work(struct work_struct *data)
 
 #define ID_PIN_WORK_RECHECK_TIME 30	/* 30 ms */
 #define ID_PIN_WORK_BLOCK_TIMEOUT 30000 /* 30000 ms */
+struct usb_role_switch {
+	struct device dev;
+	struct mutex lock; /* device lock*/
+	enum usb_role role;
+
+	/* From descriptor */
+	struct device *usb2_port;
+	struct device *usb3_port;
+	struct device *udc;
+	usb_role_switch_set_t set;
+	usb_role_switch_get_t get;
+	bool allow_userspace_control;
+};
 static void do_host_work(struct work_struct *data)
 {
 	u8 devctl = 0;
@@ -439,8 +456,8 @@ static void do_host_work(struct work_struct *data)
 #endif
 		/* setup fifo for host mode */
 		ep_config_from_table_for_host(mtk_musb);
-		if (!mtk_musb->host_suspend)
-			__pm_stay_awake(mtk_musb->usb_lock);
+
+		__pm_stay_awake(mtk_musb->usb_lock);
 
 		/* this make PHY operation workable */
 		musb_platform_enable(mtk_musb);
@@ -519,6 +536,8 @@ static void do_host_work(struct work_struct *data)
 out:
 	DBG(0, "work end, is_host=%d\n", mtk_musb->is_host);
 	up(&mtk_musb->musb_lock);
+
+	kobject_uevent(&glue->otg_sx.role_sw->dev.kobj, KOBJ_CHANGE);
 
 	if (usb_clk_state == ON_TO_OFF) {
 		/* clock on -> of: clk_prepare_cnt -2 */

@@ -9,6 +9,7 @@ COMMON_VERSION := v1_1
 subdir-ccflags-y += -I$(IMGSENSOR_DRIVER_PATH)/common/$(COMMON_VERSION) \
 	-I$(IMGSENSOR_DRIVER_PATH)/$(MTK_PLATFORM)/seninf/ \
 	-I$(MTK_DRIVER_PATH)/mmdvfs \
+    -I$(IMGSENSOR_DRIVER_PATH)/common/sysfs \
 	-I$(srctree)/drivers/i2c/busses/
 
 ifeq ($(CONFIG_MTK_PLATFORM), "mt6885")

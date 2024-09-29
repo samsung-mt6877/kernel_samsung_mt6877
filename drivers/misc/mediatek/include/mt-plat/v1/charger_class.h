@@ -78,6 +78,9 @@ struct charger_ops {
 	/* set termination current */
 	int (*get_eoc_current)(struct charger_device *dev, u32 *uA);
 	int (*set_eoc_current)(struct charger_device *dev, u32 uA);
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	int (*set_eoc_timer)(struct charger_device *dev, unsigned int time);
+#endif
 
 	/* kick wdt */
 	int (*kick_wdt)(struct charger_device *dev);
@@ -141,6 +144,10 @@ struct charger_ops {
 	/* reset EOC state */
 	int (*reset_eoc_state)(struct charger_device *dev);
 
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	int (*enable_ship_mode)(struct charger_device *dev, bool battfet);
+#endif
+
 	int (*safety_check)(struct charger_device *dev, u32 polling_ieoc);
 
 	int (*is_charging_done)(struct charger_device *dev, bool *done);
@@ -152,6 +159,9 @@ struct charger_ops {
 	int (*get_adc_accuracy)(struct charger_device *dev,
 				enum adc_channel chan, int *min, int *max);
 	int (*get_vbus_adc)(struct charger_device *dev, u32 *vbus);
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	int (*get_vsys_adc)(struct charger_device *dev, u32 *vsys);
+#endif
 	int (*get_ibus_adc)(struct charger_device *dev, u32 *ibus);
 	int (*get_ibat_adc)(struct charger_device *dev, u32 *ibat);
 	int (*get_tchg_adc)(struct charger_device *dev, int *tchg_min,
@@ -167,8 +177,22 @@ struct charger_ops {
 	int (*enable_hidden_mode)(struct charger_device *dev, bool en);
 	int (*get_ctd_dischg_status)(struct charger_device *dev, u8 *status);
 	int (*enable_hz)(struct charger_device *dev, bool en);
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	int (*enable_aicc)(struct charger_device *dev, bool en);
+#endif
 
 	int (*enable_bleed_discharge)(struct charger_device *dev, bool en);
+
+	int (*get_health)(struct charger_device *dev, int *health);
+	int (*get_charge_type)(struct charger_device *dev, int *type);
+
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	int (*get_charging_status)(struct charger_device *dev, u32 *charging_status);
+	int (*enable_eoc)(struct charger_device *chg_dev, bool en);
+	int (*en_wdt)(struct charger_device *chg_dev, bool en);
+	int (*en_ilim)(struct charger_device *chg_dev, bool en);
+	int (*set_iinlmtsel)(struct charger_device *chg_dev, bool en);
+#endif
 };
 
 static inline void *charger_dev_get_drvdata(
@@ -218,6 +242,10 @@ extern int charger_dev_get_min_input_current(
 	struct charger_device *charger_dev, u32 *uA);
 extern int charger_dev_set_eoc_current(
 	struct charger_device *charger_dev, u32 uA);
+#if defined(CONFIG_BATTERY_SAMSUNG)
+extern int charger_dev_set_eoc_timer(
+	struct charger_device *charger_dev, unsigned int time);
+#endif
 extern int charger_dev_get_eoc_current(
 	struct charger_device *charger_dev, u32 *uA);
 extern int charger_dev_kick_wdt(
@@ -264,10 +292,26 @@ extern int charger_dev_run_aicl(
 	struct charger_device *charger_dev, u32 *uA);
 extern int charger_dev_reset_eoc_state(
 	struct charger_device *charger_dev);
+#if defined(CONFIG_BATTERY_SAMSUNG)
+extern int charger_dev_enable_ship_mode(
+	struct charger_device *charger_dev, bool battfet);
+#endif
 extern int charger_dev_safety_check(
 	struct charger_device *charger_dev, u32 polling_ieoc);
 extern int charger_dev_enable_hz(
 	struct charger_device *charger_dev, bool en);
+#if defined(CONFIG_BATTERY_SAMSUNG)
+extern int charger_dev_enable_aicc(
+	struct charger_device *charger_dev, bool en);
+extern int charger_dev_enable_eoc(
+	struct charger_device *chg_dev, bool en);
+extern int charger_dev_en_wdt(
+	struct charger_device *chg_dev, bool en);
+extern int charger_dev_en_ilim(
+	struct charger_device *chg_dev, bool en);
+extern int charger_dev_set_iinlmtsel(
+	struct charger_device *chg_dev, bool en);
+#endif
 
 /* PE+/PE+2.0 */
 extern int charger_dev_send_ta_current_pattern(
@@ -297,6 +341,10 @@ extern int charger_dev_get_adc_accuracy(struct charger_device *charger_dev,
 /* Prefer use charger_dev_get_adc api */
 extern int charger_dev_get_vbus(
 	struct charger_device *charger_dev, u32 *vbus);
+#if defined(CONFIG_BATTERY_SAMSUNG)
+extern int charger_dev_get_vsys(
+	struct charger_device *charger_dev, u32 *vsys);
+#endif
 extern int charger_dev_get_ibus(
 	struct charger_device *charger_dev, u32 *ibus);
 extern int charger_dev_get_ibat(
@@ -341,6 +389,12 @@ extern int charger_dev_get_ctd_dischg_status(struct charger_device *dev,
 extern int charger_dev_enable_bleed_discharge(struct charger_device *dev,
 					      bool en);
 
+extern int charger_dev_get_health(struct charger_device *dev, int *health);
+extern int charger_dev_get_charge_type(struct charger_device *dev, int *type);
+#if defined(CONFIG_BATTERY_SAMSUNG)
+extern int charger_dev_get_charging_status(struct charger_device *charger_dev,
+				       u32 *charging_status);
+#endif
 /* For buck1 FPWM */
 extern int charger_dev_enable_hidden_mode(struct charger_device *dev, bool en);
 

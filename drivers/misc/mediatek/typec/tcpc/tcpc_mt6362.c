@@ -1764,8 +1764,7 @@ static struct irq_mapping_tbl mt6362_vend_irq_mapping_tbl[] = {
 
 static int mt6362_alert_vendor_defined_handler(struct tcpc_device *tcpc)
 {
-	int ret, i;
-	u8 irqnum, irqbit;
+	int ret, i, irqnum, irqbit;
 	u8 alert[MT6362_VEND_INT_NUM];
 	u8 mask[MT6362_VEND_INT_NUM];
 	struct mt6362_tcpc_data *tdata = tcpc_get_dev_data(tcpc);
@@ -2020,8 +2019,12 @@ static int mt6362_parse_dt(struct mt6362_tcpc_data *tdata)
 			desc->role_def = val;
 	}
 
-	if (of_property_read_u32(np, "tcpc,notifier_supply_num", &val) >= 0)
-		desc->notifier_supply_num = val;
+	if (of_property_read_u32(np, "tcpc,notifier_supply_num", &val) >= 0) {
+		if (val < 0)
+			desc->notifier_supply_num = 0;
+		else
+			desc->notifier_supply_num = val;
+	}
 
 	if (of_property_read_u32(np, "tcpc,rp_level", &val) >= 0) {
 		switch (val) {

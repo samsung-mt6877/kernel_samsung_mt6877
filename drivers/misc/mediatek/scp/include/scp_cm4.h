@@ -152,5 +152,8 @@ extern phys_addr_t scp_get_reserve_mem_size(enum scp_reserve_mem_id_t id);
 extern void scp_register_feature(enum feature_id id);
 extern void scp_deregister_feature(enum feature_id id);
 
+#ifdef CONFIG_SHUB
+extern int get_scp_dump_size(void);
+#endif
 #endif
 

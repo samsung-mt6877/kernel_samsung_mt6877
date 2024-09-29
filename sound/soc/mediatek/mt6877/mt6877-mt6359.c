@@ -22,18 +22,49 @@
 #include "aw87339.h"
 #endif
 
+#if defined(CONFIG_SND_SOC_CS35L41) || defined(CONFIG_SND_SOC_CS35L43)
+#include <sound/cirrus/big_data.h>
+#include "../../codecs/bigdata_cs35l41_sysfs_cb.h"
+#endif
+
+#if defined(CONFIG_SND_SOC_TFA9878)
+#include "../../codecs/tfa9878/bigdata_tfa_sysfs_cb.h"
+#endif
+
 /*
  * if need additional control for the ext spk amp that is connected
  * after Lineout Buffer / HP Buffer on the codec, put the control in
  * mt6877_mt6359_spk_amp_event()
  */
 #define EXT_SPK_AMP_W_NAME "Ext_Speaker_Amp"
+#if defined(CONFIG_SND_SOC_CS35L41) || defined(CONFIG_SND_SOC_CS35L43)
+#define SMARTPA_AMP_W_NAME "SMARTPA AMP"
+#endif
+
+#define CODEC_MAX			32
 
 static const char *const mt6877_spk_type_str[] = {MTK_SPK_NOT_SMARTPA_STR,
+#if defined(CONFIG_SND_SOC_RT5509)
 						  MTK_SPK_RICHTEK_RT5509_STR,
+#endif
+#if defined(CONFIG_SND_SOC_MT6660)
 						  MTK_SPK_MEDIATEK_MT6660_STR,
+#endif
+#if defined(CONFIG_SND_SOC_TFA9874)
 						  MTK_SPK_NXP_TFA98XX_STR,
+#endif
+#ifdef CONFIG_SND_SOC_CS35L41
+						  MTK_SPK_CIRRUS_CS35L41_STR,
+#endif
+#ifdef CONFIG_SND_SOC_CS35L43
+						  MTK_SPK_CIRRUS_CS35L43_STR,
+#endif
+#ifdef CONFIG_SND_SOC_TFA9878
+						  MTK_SPK_GOODIX_TFA9878_STR,
+#endif
+#if defined(CONFIG_SND_SOC_RT5512)
 						  MTK_SPK_MEDIATEK_RT5512_STR
+#endif
 						  };
 static const char *const
 	mt6877_spk_i2s_type_str[] = {MTK_SPK_I2S_0_STR,
@@ -114,18 +145,98 @@ static int mt6877_mt6359_spk_amp_event(struct snd_soc_dapm_widget *w,
 	return 0;
 };
 
+#ifdef CONFIG_SND_SOC_CS35L41
+static int smartpa_amp_event(struct snd_soc_dapm_widget *w,
+				       struct snd_kcontrol *kcontrol,
+				       int event)
+{
+	struct snd_soc_dapm_context *dapm = w->dapm;
+	struct snd_soc_card *card = dapm->card;
+
+	dev_info(card->dev, "%s(), event %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		/* spk amp off control */
+		cirrus_bd_store_values("_0");
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+};
+#endif
+
+#ifdef CONFIG_SND_SOC_CS35L43
+static int smartpa_l_speaker(struct snd_soc_dapm_widget *w,
+			struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_card *card = w->dapm->card;
+
+	dev_info(card->dev, "%s ev: %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMD:
+		cirrus_bd_store_values("_0");
+		break;
+	}
+
+	return 0;
+}
+
+static int smartpa_r_speaker(struct snd_soc_dapm_widget *w,
+			struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_card *card = w->dapm->card;
+
+	dev_info(card->dev, "%s ev: %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMD:
+		cirrus_bd_store_values("_1");
+		break;
+	}
+
+	return 0;
+}
+#endif
+
 static const struct snd_soc_dapm_widget mt6877_mt6359_widgets[] = {
 	SND_SOC_DAPM_SPK(EXT_SPK_AMP_W_NAME, mt6877_mt6359_spk_amp_event),
+#ifdef CONFIG_SND_SOC_CS35L41
+	SND_SOC_DAPM_SPK(SMARTPA_AMP_W_NAME, smartpa_amp_event),
+#endif
+#ifdef CONFIG_SND_SOC_CS35L43
+	SND_SOC_DAPM_SPK("RECEIVER", smartpa_l_speaker),
+	SND_SOC_DAPM_SPK("SPEAKER", smartpa_r_speaker),
+#endif
 };
 
 static const struct snd_soc_dapm_route mt6877_mt6359_routes[] = {
 	{EXT_SPK_AMP_W_NAME, NULL, "LINEOUT L"},
 	{EXT_SPK_AMP_W_NAME, NULL, "Headphone L Ext Spk Amp"},
 	{EXT_SPK_AMP_W_NAME, NULL, "Headphone R Ext Spk Amp"},
+#ifdef CONFIG_SND_SOC_CS35L41
+	{SMARTPA_AMP_W_NAME, NULL, "AMP SPK"},
+#endif
+#ifdef CONFIG_SND_SOC_CS35L43
+	{"RECEIVER", NULL, "Left AMP SPK"},
+	{"SPEAKER", NULL, "Right AMP SPK"},
+#endif
 };
 
 static const struct snd_kcontrol_new mt6877_mt6359_controls[] = {
 	SOC_DAPM_PIN_SWITCH(EXT_SPK_AMP_W_NAME),
+#ifdef CONFIG_SND_SOC_CS35L41
+	SOC_DAPM_PIN_SWITCH(SMARTPA_AMP_W_NAME),
+#endif
+#ifdef CONFIG_SND_SOC_CS35L43
+	SOC_DAPM_PIN_SWITCH("SPEAKER"),
+	SOC_DAPM_PIN_SWITCH("RECEIVER"),
+#endif
 	SOC_ENUM_EXT("MTK_SPK_TYPE_GET", mt6877_spk_type_enum[0],
 		     mt6877_spk_type_get, NULL),
 	SOC_ENUM_EXT("MTK_SPK_I2S_OUT_TYPE_GET", mt6877_spk_type_enum[1],
@@ -153,6 +264,73 @@ static int mt6877_mt6359_i2s_hw_params(struct snd_pcm_substream *substream,
 static const struct snd_soc_ops mt6877_mt6359_i2s_ops = {
 	.hw_params = mt6877_mt6359_i2s_hw_params,
 };
+
+#if defined(CONFIG_SND_SOC_CS35L41) || defined(CONFIG_SND_SOC_CS35L43)
+static int cs35l41_i2s3_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_component *component = NULL;
+
+	if (!codec_dai)
+		return 0;
+
+	component = codec_dai->component;
+
+	if (component && strstr(component->name, "speaker_amp"))
+		register_cirrus_bigdata_cb(component);
+
+	return 0;
+}
+
+static int cs35l41_hw_params(struct snd_pcm_substream *substream,
+					       struct snd_pcm_hw_params *params)
+{
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_card *card = rtd->card;
+	struct snd_soc_dai **codec_dais = rtd->codec_dais;
+	unsigned int clk;
+	unsigned int num_codecs = rtd->num_codecs;
+	int ret = 0, i;
+	
+	/* using bclk for sysclk */
+	clk = snd_soc_params_to_bclk(params);
+	for (i = 0; i < num_codecs; i++) {
+		ret = snd_soc_component_set_sysclk(codec_dais[i]->component,
+				0, 0, clk,
+				SND_SOC_CLOCK_IN);
+		if (ret < 0) {
+			dev_err(card->dev, "%s: set codec sysclk failed: %d\n",
+					codec_dais[i]->name, ret);
+		} else {
+			dev_info(card->dev, "%s: set amp sysclk : %d\n", codec_dais[i]->name, clk);
+		}
+	}
+
+	return ret;
+}
+
+static const struct snd_soc_ops cs35l41_ops = {
+		.hw_params = cs35l41_hw_params,
+};
+#endif
+
+#if defined(CONFIG_SND_SOC_TFA9878)
+static int tfa9878_i2s3_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+	struct snd_soc_component *component = NULL;
+
+	if (!codec_dai)
+		return 0;
+
+	component = codec_dai->component;
+
+	if (component && strstr(component->name, "speaker_amp"))
+		register_tfa98xx_bigdata_cb(component);
+
+	return 0;
+}
+#endif
 
 static int mt6877_mt6359_mtkaif_calibration(struct snd_soc_pcm_runtime *rtd)
 {
@@ -813,6 +991,13 @@ static struct snd_soc_dai_link mt6877_mt6359_dai_links[] = {
 		.dpcm_playback = 1,
 		.ignore_suspend = 1,
 		.be_hw_params_fixup = mt6877_i2s_hw_params_fixup,
+#if defined(CONFIG_SND_SOC_CS35L41) || defined(CONFIG_SND_SOC_CS35L43)
+		.init = cs35l41_i2s3_init,
+		.ops = &cs35l41_ops,
+#endif
+#if defined(CONFIG_SND_SOC_TFA9878)
+		.init = tfa9878_i2s3_init
+#endif
 	},
 	{
 		.name = "I2S0",
@@ -823,6 +1008,9 @@ static struct snd_soc_dai_link mt6877_mt6359_dai_links[] = {
 		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 		.be_hw_params_fixup = mt6877_i2s_hw_params_fixup,
+#if defined(CONFIG_SND_SOC_CS35L41) || defined(CONFIG_SND_SOC_CS35L43)
+		.ops = &cs35l41_ops,
+#endif
 	},
 	{
 		.name = "I2S1",
@@ -979,6 +1167,7 @@ static struct snd_soc_dai_link mt6877_mt6359_dai_links[] = {
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
 		.no_pcm = 1,
+		.dpcm_playback = 1,
 		.dpcm_capture = 1,
 		.ignore_suspend = 1,
 	},
@@ -1123,6 +1312,62 @@ static struct snd_soc_dai_link mt6877_mt6359_dai_links[] = {
 		.codec_name = "snd-soc-dummy",
 		.codec_dai_name = "snd-soc-dummy-dai",
 	},
+	{
+		.name = "DSP_Playback_BLEDL",
+		.stream_name = "DSP_Playback_BLEDL",
+		.cpu_dai_name = "audio_task_bledl_dai",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+	},
+	{
+		.name = "DSP_Capture_BLE",
+		.stream_name = "DSP_Capture_BLE",
+		.cpu_dai_name = "audio_task_bleul_dai",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+	},
+	{
+		.name = "DSP_Capture_Process",
+		.stream_name = "DSP_Capture_Process",
+		.cpu_dai_name = "audio_task_ulproc_dai",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+	},
+	{
+		.name = "DSP_Playback_Echoref",
+		.stream_name = "DSP_Playback_Echoref",
+		.cpu_dai_name = "audio_task_echodl_dai",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+	},
+	{
+		.name = "DSP_Playback_USB",
+		.stream_name = "DSP_Playback_USB",
+		.cpu_dai_name = "audio_task_usbdl_dai",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+	},
+	{
+		.name = "DSP_Capture_USB",
+		.stream_name = "DSP_Capture_USB",
+		.cpu_dai_name = "audio_task_usbul_dai",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+	},
+	{
+		.name = "DSP_Capture_MDDL",
+		.stream_name = "DSP_Capture_MDDL",
+		.cpu_dai_name = "audio_task_mddl_dai",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+	},
+	{
+		.name = "DSP_Playback_MDUL",
+		.stream_name = "DSP_Playback_MDUL",
+		.cpu_dai_name = "audio_task_mdul_dai",
+		.codec_name = "snd-soc-dummy",
+		.codec_dai_name = "snd-soc-dummy-dai",
+	},
 #endif
 #ifdef CONFIG_MTK_VOW_SUPPORT
 	{
@@ -1156,6 +1401,8 @@ static struct snd_soc_dai_link mt6877_mt6359_dai_links[] = {
 #endif
 };
 
+static struct snd_soc_codec_conf codec_conf[CODEC_MAX];
+
 static struct snd_soc_card mt6877_mt6359_soc_card = {
 	.name = "mt6877-mt6359",
 	.owner = THIS_MODULE,
@@ -1168,12 +1415,15 @@ static struct snd_soc_card mt6877_mt6359_soc_card = {
 	.num_dapm_widgets = ARRAY_SIZE(mt6877_mt6359_widgets),
 	.dapm_routes = mt6877_mt6359_routes,
 	.num_dapm_routes = ARRAY_SIZE(mt6877_mt6359_routes),
+	.codec_conf = codec_conf,
+	.num_configs = ARRAY_SIZE(codec_conf),
 };
 
 static int mt6877_mt6359_dev_probe(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = &mt6877_mt6359_soc_card;
 	struct device_node *platform_node, *codec_node, *spk_node, *dsp_node;
+	struct device_node *np = pdev->dev.of_node;
 	struct snd_soc_dai_link *spk_out_dai_link, *spk_iv_dai_link;
 	int ret, i;
 	int spk_out_dai_link_idx, spk_iv_dai_link_idx;
@@ -1262,6 +1512,18 @@ static int mt6877_mt6359_dev_probe(struct platform_device *pdev)
 			continue;
 		mt6877_mt6359_dai_links[i].codec_of_node = codec_node;
 	}
+
+	for (i = 0; i < ARRAY_SIZE(codec_conf); i++) {
+		codec_conf[i].of_node = of_parse_phandle(np, "samsung,codec", i);
+		if (!codec_conf[i].of_node)
+			break;
+
+		ret = of_property_read_string_index(np, "samsung,prefix", i,
+				&codec_conf[i].name_prefix);
+		if (ret < 0)
+			codec_conf[i].name_prefix = "";
+	}
+	card->num_configs = i;
 
 	card->dev = &pdev->dev;
 

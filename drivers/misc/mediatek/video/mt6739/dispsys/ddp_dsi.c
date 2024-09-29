@@ -448,10 +448,11 @@ void DSI_enter_ULPS(enum DISP_MODULE_ENUM module)
 
 		DSI_OUTREGBIT(NULL, struct DSI_PHY_LD0CON_REG,
 			      DSI_REG[i]->DSI_PHY_LD0CON, Lx_ULPM_AS_L0, 1);
-		DSI_OUTREGBIT(NULL, struct DSI_PHY_LD0CON_REG,
-			      DSI_REG[i]->DSI_PHY_LD0CON, L0_ULPM_EN, 1);
 		DSI_OUTREGBIT(NULL, struct DSI_PHY_LCCON_REG,
 			      DSI_REG[i]->DSI_PHY_LCCON, LC_ULPM_EN, 1);
+		udelay(1);
+		DSI_OUTREGBIT(NULL, struct DSI_PHY_LD0CON_REG,
+			      DSI_REG[i]->DSI_PHY_LD0CON, L0_ULPM_EN, 1);
 
 		waitq = &(_dsi_context[i].sleep_in_done_wq);
 		ret = wait_event_timeout(waitq->wq,
@@ -465,9 +466,6 @@ void DSI_enter_ULPS(enum DISP_MODULE_ENUM module)
 
 		DSI_OUTREGBIT(NULL, struct DSI_INT_ENABLE_REG,
 			      DSI_REG[i]->DSI_INTEN, SLEEPIN_ULPS_INT_EN, 0);
-		/* clear lane_num when enter ulps */
-		DSI_OUTREGBIT(NULL, struct DSI_TXRX_CTRL_REG,
-			      DSI_REG[i]->DSI_TXRX_CTRL, LANE_NUM, 0);
 	}
 }
 
@@ -495,11 +493,6 @@ void DSI_exit_ULPS(enum DISP_MODULE_ENUM module)
 			      DSI_REG[i]->DSI_PHY_LD0CON, Lx_ULPM_AS_L0, 1);
 		DSI_OUTREGBIT(NULL, struct DSI_INT_ENABLE_REG,
 			      DSI_REG[i]->DSI_INTEN, SLEEPOUT_DONE, 1);
-		DSI_OUTREGBIT(NULL, struct DSI_MODE_CTRL_REG,
-			      DSI_REG[i]->DSI_MODE_CTRL, SLEEP_MODE, 1);
-		DSI_OUTREGBIT(NULL, struct DSI_TIME_CON0_REG,
-			      DSI_REG[i]->DSI_TIME_CON0, UPLS_WAKEUP_PRD,
-			      wake_up_prd);
 
 		switch (_dsi_context[i].dsi_params.LANE_NUM) {
 		case LCM_ONE_LANE:
@@ -522,6 +515,11 @@ void DSI_exit_ULPS(enum DISP_MODULE_ENUM module)
 			      DSI_REG[i]->DSI_TXRX_CTRL, LANE_NUM,
 			      lane_num_bitvalue);
 
+		DSI_OUTREGBIT(NULL, struct DSI_MODE_CTRL_REG,
+			DSI_REG[i]->DSI_MODE_CTRL, SLEEP_MODE, 1);
+		DSI_OUTREGBIT(NULL, struct DSI_TIME_CON0_REG,
+			DSI_REG[i]->DSI_TIME_CON0, UPLS_WAKEUP_PRD,
+			wake_up_prd);
 		DSI_OUTREGBIT(NULL, struct DSI_START_REG, DSI_REG[i]->DSI_START,
 			      SLEEPOUT_START, 0);
 		DSI_OUTREGBIT(NULL, struct DSI_START_REG, DSI_REG[i]->DSI_START,
@@ -2006,7 +2004,7 @@ UINT32 DSI_dcs_read_lcm_reg_v2(enum DISP_MODULE_ENUM module,
 }
 
 void DSI_set_cmdq_V2(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
-		     unsigned int cmd, unsigned char count,
+		     unsigned int cmd, unsigned int count,
 		     unsigned char *para_list, unsigned char force_update)
 {
 	UINT32 i = 0;
@@ -2244,7 +2242,8 @@ void DSI_set_cmdq_V3(enum DISP_MODULE_ENUM module, struct cmdqRecStruct *cmdq,
 	/* DSI_T1_INS t1; */
 	struct DSI_T2_INS t2;
 	UINT32 index = 0;
-	unsigned char data_id, cmd, count;
+	unsigned char data_id, cmd;
+	unsigned int count;
 	unsigned char *para_list;
 	UINT32 d;
 
@@ -2486,42 +2485,42 @@ void DSI_set_cmdq_V11_wrapper_DSI1(void *cmdq, unsigned int *pdata,
 	DSI_set_cmdq(DISP_MODULE_DSI1, cmdq, pdata, queue_size, force_update);
 }
 
-void DSI_set_cmdq_V2_DSI0(void *cmdq, unsigned int cmd, unsigned char count,
+void DSI_set_cmdq_V2_DSI0(void *cmdq, unsigned int cmd, unsigned int count,
 			unsigned char *para_list, unsigned char force_update)
 {
 	DSI_set_cmdq_V2(DISP_MODULE_DSI0, cmdq, cmd, count, para_list,
 			force_update);
 }
 
-void DSI_set_cmdq_V2_DSI1(void *cmdq, unsigned int cmd, unsigned char count,
+void DSI_set_cmdq_V2_DSI1(void *cmdq, unsigned int cmd, unsigned int count,
 			unsigned char *para_list, unsigned char force_update)
 {
 	DSI_set_cmdq_V2(DISP_MODULE_DSI1, cmdq, cmd, count, para_list,
 			force_update);
 }
 
-void DSI_set_cmdq_V2_DSIDual(void *cmdq, unsigned int cmd, unsigned char count,
+void DSI_set_cmdq_V2_DSIDual(void *cmdq, unsigned int cmd, unsigned int count,
 			unsigned char *para_list, unsigned char force_update)
 {
 	DSI_set_cmdq_V2(DISP_MODULE_DSIDUAL, cmdq, cmd, count, para_list,
 			force_update);
 }
 
-void DSI_set_cmdq_V2_Wrapper_DSI0(unsigned int cmd, unsigned char count,
+void DSI_set_cmdq_V2_Wrapper_DSI0(unsigned int cmd, unsigned int count,
 			unsigned char *para_list, unsigned char force_update)
 {
 	DSI_set_cmdq_V2(DISP_MODULE_DSI0, NULL, cmd, count, para_list,
 			force_update);
 }
 
-void DSI_set_cmdq_V2_Wrapper_DSI1(unsigned int cmd, unsigned char count,
+void DSI_set_cmdq_V2_Wrapper_DSI1(unsigned int cmd, unsigned int count,
 			unsigned char *para_list, unsigned char force_update)
 {
 	DSI_set_cmdq_V2(DISP_MODULE_DSI1, NULL, cmd, count, para_list,
 			force_update);
 }
 
-void DSI_set_cmdq_V2_Wrapper_DSIDual(unsigned int cmd, unsigned char count,
+void DSI_set_cmdq_V2_Wrapper_DSIDual(unsigned int cmd, unsigned int count,
 			unsigned char *para_list, unsigned char force_update)
 {
 	DSI_set_cmdq_V2(DISP_MODULE_DSIDUAL, NULL, cmd, count, para_list,

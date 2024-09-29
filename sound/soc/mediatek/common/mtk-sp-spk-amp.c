@@ -20,6 +20,7 @@
 
 #include "mtk-sp-common.h"
 #include "mtk-sp-spk-amp.h"
+
 #if defined(CONFIG_SND_SOC_RT5509)
 #include "../../codecs/rt5509.h"
 #endif
@@ -38,6 +39,22 @@
 #include "aw87339.h"
 #endif
 
+#if defined(CONFIG_SND_SOC_AW8896)
+#include "../../codecs/aw8896.h"
+#endif
+
+#if defined(CONFIG_SND_SMARTPA_AW882XX)
+#include "../../codecs/aw882xx/aw882xx.h"
+#endif
+
+#if defined(CONFIG_SND_SOC_CS35L41) || defined(CONFIG_SND_SOC_CS35L43)
+#include <sound/cirrus/core.h>
+#endif
+
+#if defined(CONFIG_SND_SOC_TFA9878)
+#include "../../codecs/tfa98xx/inc/tfa98xx_ext.h"
+#endif
+
 #define MTK_SPK_NAME "Speaker Codec"
 #define MTK_SPK_REF_NAME "Speaker Codec Ref"
 static unsigned int mtk_spk_type;
@@ -47,6 +64,46 @@ static struct mtk_spk_i2c_ctrl mtk_spk_list[MTK_SPK_TYPE_NUM] = {
 		.codec_dai_name = "snd-soc-dummy-dai",
 		.codec_name = "snd-soc-dummy",
 	},
+#if defined(CONFIG_SND_SOC_AW8896)
+	[MTK_SPK_AWINIC_AW8896] = {
+		.i2c_probe = aw8896_i2c_probe,
+		.i2c_remove = aw8896_i2c_remove,
+		.codec_dai_name = "aw8896-aif",
+		.codec_name = "aw8896_smartpa",
+	},
+#endif
+#if defined(CONFIG_SND_SMARTPA_AW882XX)
+	[MTK_SPK_AWINIC_AW882XX] = {
+		.i2c_probe = aw882xx_i2c_probe,
+		.i2c_remove = aw882xx_i2c_remove,
+		.codec_dai_name = "aw882xx-aif",
+		.codec_name = "aw882xx_smartpa",
+	},
+#endif
+#ifdef CONFIG_SND_SOC_CS35L41
+	[MTK_SPK_CIRRUS_CS35L41] = {
+		.i2c_probe = cs35l41_i2c_probe,
+		.i2c_remove = cs35l41_i2c_remove,
+		.codec_dai_name = "cs35l41-pcm",
+		.codec_name = "cs35l41-codec.5.auto",
+	},
+#endif /* CONFIG_SND_SOC_CS35L41 */
+#ifdef CONFIG_SND_SOC_CS35L43
+	[MTK_SPK_CIRRUS_CS35L43] = {
+		.i2c_probe = cs35l43_i2c_probe,
+		.i2c_remove = cs35l43_i2c_remove,
+		.codec_dai_name = "cs35l43-pcm",
+		.codec_name = "cs35l43-codec.5.auto",
+	},
+#endif /* CONFIG_SND_SOC_CS35L43 */
+#ifdef CONFIG_SND_SOC_TFA9878
+	[MTK_SPK_GOODIX_TFA9878] = {
+		.i2c_probe = tfa98xx_i2c_probe,
+		.i2c_remove = tfa98xx_i2c_remove,
+		.codec_dai_name = "tfa9878-aif",
+		.codec_name = "tfa9878-codec.5.auto",
+	},
+#endif /* CONFIG_SND_SOC_TFA9878 */
 #if defined(CONFIG_SND_SOC_RT5509)
 	[MTK_SPK_RICHTEK_RT5509] = {
 		.i2c_probe = rt5509_i2c_probe,
@@ -435,6 +492,7 @@ int mtk_spk_send_ipi_buf_to_dsp(void *data_buffer, uint32_t data_size)
 
 	result = audio_send_ipi_buf_to_dsp(&ipi_msg, task_scene,
 					   AUDIO_DSP_TASK_AURISYS_SET_BUF,
+					   mtk_spk_get_type(),
 					   data_buffer, data_size);
 #endif
 	return result;
@@ -465,6 +523,7 @@ int mtk_spk_recv_ipi_buf_from_dsp(int8_t *buffer,
 	result = audio_recv_ipi_buf_from_dsp(&ipi_msg,
 					     task_scene,
 					     AUDIO_DSP_TASK_AURISYS_GET_BUF,
+					     mtk_spk_get_type(),
 					     buffer, size, buf_len);
 #endif
 	return result;
@@ -472,8 +531,22 @@ int mtk_spk_recv_ipi_buf_from_dsp(int8_t *buffer,
 EXPORT_SYMBOL(mtk_spk_recv_ipi_buf_from_dsp);
 
 static const struct i2c_device_id mtk_spk_i2c_id[] = {
-	{ "tfa98xx", 0},
+#if defined(CONFIG_SND_SOC_AW8896)
+	{ "aw8896", 0},
+#endif
+#if defined(CONFIG_SND_SMARTPA_AW882XX)
+	{ "aw882xx_smartpa", 0},
+#endif
 	{ "speaker_amp", 0},
+#ifdef CONFIG_SND_SOC_CS35L41
+	{"cs35l41", 0},
+#endif
+#ifdef CONFIG_SND_SOC_CS35L43
+	{"cs35l43", 0},
+#endif
+#ifdef CONFIG_SND_SOC_TFA9878
+	{"tfa98xx", 0},
+#endif
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, mtk_spk_i2c_id);
@@ -481,7 +554,22 @@ MODULE_DEVICE_TABLE(i2c, mtk_spk_i2c_id);
 #ifdef CONFIG_OF
 static const struct of_device_id mtk_spk_match_table[] = {
 	{.compatible = "nxp,tfa98xx",},
+#if defined(CONFIG_SND_SOC_AW8896)
+	{.compatible = "awinic,aw8896_smartpa",},
+#endif
+#if defined(CONFIG_SND_SMARTPA_AW882XX)
+	{.compatible = "awinic,aw882xx_smartpa" },
+#endif
 	{.compatible = "mediatek,speaker_amp",},
+#ifdef CONFIG_SND_SOC_CS35L41
+	{.compatible = "cirrus,cs35l41"},
+#endif
+#ifdef CONFIG_SND_SOC_CS35L43
+	{.compatible = "cirrus,cs35l43"},
+#endif
+#ifdef CONFIG_SND_SOC_TFA9878
+	{.compatible = "tfa,tfa98xx"},
+#endif
 	{},
 };
 MODULE_DEVICE_TABLE(of, mtk_spk_match_table);
@@ -492,6 +580,9 @@ static struct i2c_driver mtk_spk_i2c_driver = {
 		.name = "speaker_amp",
 		.owner = THIS_MODULE,
 		.of_match_table = of_match_ptr(mtk_spk_match_table),
+#ifdef CONFIG_SND_SOC_CS35L43
+		.pm = &cs35l43_pm_ops,
+#endif
 	},
 	.probe = mtk_spk_i2c_probe,
 	.remove = mtk_spk_i2c_remove,

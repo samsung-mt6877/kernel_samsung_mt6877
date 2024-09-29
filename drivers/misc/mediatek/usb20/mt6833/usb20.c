@@ -23,6 +23,13 @@
 #endif
 
 #include <mt-plat/mtk_boot_common.h>
+#if defined(CONFIG_BATTERY_SAMSUNG)
+#include "../../../../battery/common/sec_charging_common.h"
+#endif
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+#include <linux/usb_notify.h>
+#endif
+
 MODULE_LICENSE("GPL v2");
 
 struct musb *mtk_musb;
@@ -78,6 +85,62 @@ EXPORT_SYMBOL(register_usb_hal_disconnect_check);
 #ifndef FPGA_PLATFORM
 #include <linux/arm-smccc.h>
 #include <linux/soc/mediatek/mtk_sip_svc.h>
+
+#if defined(CONFIG_BATTERY_SAMSUNG)
+static int musb_set_vbus_current(int usb_state)
+{
+	struct power_supply *psy;
+	union power_supply_propval pval = {0};
+	int cur = 100;
+
+	if (usb_state == USB_CONFIGURED)
+		cur = USB_CURRENT_HIGH_SPEED;
+	else
+		cur = USB_CURRENT_UNCONFIGURED;
+
+	pr_info("%s : %dmA\n", __func__, cur);
+
+	psy = power_supply_get_by_name("battery");
+	if (psy) {
+		pval.intval = cur;
+		psy_do_property("battery", set,
+		POWER_SUPPLY_EXT_PROP_USB_CONFIGURE, pval);
+		power_supply_put(psy);
+	}
+
+	return 0;
+}
+
+static void musb_set_vbus_current_work(struct work_struct *w)
+{
+	struct musb *musb = container_of(w,
+		struct musb, set_vbus_current_work);
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+	struct otg_notify *o_notify = get_otg_notify();
+
+	switch (musb->usb_state) {
+	case USB_SUSPEND:
+		/* set vbus current for suspend state is called in usb_notify. */
+		send_otg_notify(o_notify, NOTIFY_EVENT_USBD_SUSPENDED, 1);
+		goto skip;
+	case USB_UNCONFIGURED:
+		send_otg_notify(o_notify, NOTIFY_EVENT_USBD_UNCONFIGURED, 1);
+		break;
+	case USB_CONFIGURED:
+		send_otg_notify(o_notify, NOTIFY_EVENT_USBD_CONFIGURED, 1);
+		break;
+	default:
+		break;
+	}
+#endif
+	musb_set_vbus_current(musb->usb_state);
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+skip:
+	return;
+#endif
+}
+#endif
+
 static void usb_dpidle_request(int mode)
 {
 	struct arm_smccc_res res;
@@ -568,6 +631,7 @@ static void mt_usb_try_idle(struct musb *musb, unsigned long timeout)
 
 static int real_enable = 0, real_disable;
 static int virt_enable = 0, virt_disable;
+
 static void mt_usb_enable(struct musb *musb)
 {
 	unsigned long flags;
@@ -719,6 +783,22 @@ static bool musb_hal_is_vbus_exist(void)
 
 DEFINE_MUTEX(cable_connected_lock);
 /* be aware this could not be used in non-sleep context */
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+bool usb_cable_connected(void)
+{
+	struct otg_notify *usb_notify;
+	int usb_mode = 0;
+
+	usb_notify = get_otg_notify();
+	usb_mode = get_usb_mode(usb_notify);
+	pr_info("usb: %s: %d\n", __func__, usb_mode);
+	if (usb_mode == NOTIFY_PERIPHERAL_MODE)
+		return true;
+	else
+		return false;
+
+}
+#else
 bool usb_cable_connected(struct musb *musb)
 {
 	if (musb->usb_connected)
@@ -726,6 +806,7 @@ bool usb_cable_connected(struct musb *musb)
 	else
 		return false;
 }
+#endif
 
 static bool cmode_effect_on(void)
 {
@@ -756,8 +837,12 @@ void do_connection_work(struct work_struct *data)
 	/* clk_prepare_cnt +1 here*/
 	usb_prepare_clock(true);
 
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+	usb_connected = usb_cable_connected();
+#else
 	/* be aware this could not be used in non-sleep context */
 	usb_connected = mtk_musb->usb_connected;
+#endif
 
 	/* additional check operation here */
 	if (musb_force_on)
@@ -931,6 +1016,10 @@ void musb_sync_with_bat(struct musb *musb, int usb_state)
 #ifdef CONFIG_MTK_CHARGER
 	BATTERY_SetUSBState(usb_state);
 #endif
+#endif
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	musb->usb_state = usb_state;
+	schedule_work(&musb->set_vbus_current_work);
 #endif
 }
 EXPORT_SYMBOL(musb_sync_with_bat);
@@ -1721,6 +1810,9 @@ static int __init mt_usb_init(struct musb *musb)
 
 	timer_setup(&musb->idle_timer, musb_do_idle, 0);
 
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	INIT_WORK(&musb->set_vbus_current_work, musb_set_vbus_current_work);
+#endif
 #ifdef CONFIG_USB_MTK_OTG
 	mt_usb_otg_init(musb);
 	/* enable host suspend mode */
@@ -1970,6 +2062,7 @@ static int mt_usb_probe(struct platform_device *pdev)
 		DBG(0, "failed to init_sysfs\n");
 		goto err2;
 	}
+
 #ifdef CONFIG_USB_MTK_OTG
 	pdata->dr_mode = usb_get_dr_mode(&pdev->dev);
 #else

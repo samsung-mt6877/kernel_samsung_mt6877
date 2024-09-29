@@ -93,6 +93,7 @@
 #ifdef MTK_FB_MMDVFS_SUPPORT
 #include <linux/soc/mediatek/mtk-pm-qos.h>
 #endif
+#include "mtk_notify.h"
 
 #define MMSYS_CLK_LOW (0)
 #define MMSYS_CLK_HIGH (1)
@@ -178,6 +179,10 @@ static bool pf_thread_init;
 atomic_t primary_display_pt_fence_update_event = ATOMIC_INIT(0);
 static unsigned int _need_lfr_check(void);
 struct Layer_draw_info *draw;
+struct mtk_uevent_dev uevent_data;
+EXPORT_SYMBOL(uevent_data);
+
+static bool is_tui_started; //static init to false
 
 #ifdef CONFIG_MTK_DISPLAY_120HZ_SUPPORT
 static int od_need_start;
@@ -1638,7 +1643,7 @@ void disp_spm_enter_power_down_mode(void)
 
 void _cmdq_start_trigger_loop(void)
 {
-	int ret = 0;
+	int ret = 0, n_cnt = 0;
 
 	ret = cmdqRecStartLoop(pgc->cmdq_handle_trigger);
 	if (ret < 0) {
@@ -1657,6 +1662,21 @@ void _cmdq_start_trigger_loop(void)
 		 * stuck in dead loop
 		 */
 		cmdqCoreSetEvent(CMDQ_SYNC_TOKEN_STREAM_EOF);
+		/*check GCE REG if it's not ready and set it again*/
+		while (!cmdqCoreGetEvent(CMDQ_SYNC_TOKEN_STREAM_EOF)) {
+			n_cnt++;
+
+			if (n_cnt > 5) {
+				DISPERR("Retry 5 times, but set CMDQ_SYNC_TOKEN_STREAM_EOF fail\n");
+				break;
+			}
+
+			DISPCHECK("set CMDQ_SYNC_TOKEN_STREAM_EOF = %d\n",
+					cmdqCoreGetEvent(CMDQ_SYNC_TOKEN_STREAM_EOF));
+			cmdqCoreSetEvent(CMDQ_SYNC_TOKEN_STREAM_EOF);
+			usleep_range(5000, 10000);
+		}
+
 		cmdqCoreSetEvent(CMDQ_SYNC_TOKEN_CABC_EOF);
 		cmdqCoreSetEvent(CMDQ_EVENT_DISP_WDMA0_EOF);
 		dprec_event_op(DPREC_EVENT_CMDQ_SET_EVENT_ALLOW);
@@ -4230,6 +4250,9 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps,
 	/*DynFPS*/
 	primary_display_init_multi_cfg_info();
 #endif
+	uevent_data.name = "lcm_disconnect";
+	uevent_dev_register(&uevent_data);
+	mtk_notifier_activate();
 
 	DISPCHECK("%s done\n", __func__);
 
@@ -4707,7 +4730,9 @@ int primary_display_suspend(void)
 #ifdef CONFIG_MTK_HIGH_FRAME_RATE
 	int active_cfg = 0;
 #endif
-
+#if defined(CONFIG_MTK_VSYNC_PRINT)
+	disp_unregister_irq_callback(vsync_print_handler);
+#endif
 	DISPCHECK("%s begin\n", __func__);
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_suspend,
 		MMPROFILE_FLAG_START, 0, 0);
@@ -4721,17 +4746,26 @@ int primary_display_suspend(void)
 	if (primary_display_is_video_mode())
 		primary_display_switch_dst_mode(0);
 #endif
+#if defined(CONFIG_SMCDSD_PANEL)
+	disp_lcm_path_lock(1, pgc->plcm);
+#endif
 	_primary_path_switch_dst_lock();
 	disp_sw_mutex_lock(&(pgc->capture_lock));
 	_primary_path_lock(__func__);
 
 	while (primary_get_state() == DISP_BLANK) {
 		_primary_path_unlock(__func__);
+#if defined(CONFIG_SMCDSD_PANEL)
+		disp_lcm_path_lock(0, pgc->plcm);
+#endif
 		DISPCHECK("p%s wait tui finish!!\n", __func__);
 #if 0 //def CONFIG_TRUSTONIC_TRUSTED_UI
 		switch_set_state(&disp_switch_data, DISP_SLEPT);
 #endif
 		primary_display_wait_state(DISP_ALIVE, MAX_SCHEDULE_TIMEOUT);
+#if defined(CONFIG_SMCDSD_PANEL)
+		disp_lcm_path_lock(1, pgc->plcm);
+#endif
 		_primary_path_lock(__func__);
 		DISPCHECK("%s wait tui done stat=%d\n", __func__,
 			primary_get_state());
@@ -4804,6 +4838,13 @@ int primary_display_suspend(void)
 	if (!primary_display_is_video_mode())
 		polling_rdma_output_line_enable = 0;
 
+#if defined(CONFIG_SMCDSD_PANEL)
+	if (primary_display_get_power_mode_nolock() == FB_SUSPEND)
+		disp_lcm_disable(pgc->plcm);
+
+	/* From now, MIPI TX command will be written on register directly */
+	disp_lcm_cmdq(pgc->plcm, 0);
+#endif
 	if (disp_helper_get_option(DISP_OPT_USE_CMDQ)) {
 		DISPCHECK("[POWER]display cmdq trigger loop stop\n");
 		_cmdq_stop_trigger_loop();
@@ -4888,6 +4929,10 @@ int primary_display_suspend(void)
 	pgc->active_cfg = 0;
 	active_cfg = pgc->active_cfg;
 #endif
+#if defined(CONFIG_SMCDSD_PANEL)
+	if (primary_display_get_power_mode_nolock() == FB_SUSPEND)
+		disp_lcm_power_enable(pgc->plcm, 0);
+#endif
 	/* pgc->state = DISP_SLEPT; */
 	if (bdg_is_bdg_connected() == 1)
 		bdg_common_deinit(DISP_BDG_DSI0, NULL);
@@ -4901,6 +4946,9 @@ done:
 	lock_primary_wake_lock(0);
 
 	_primary_path_unlock(__func__);
+#if defined(CONFIG_SMCDSD_PANEL)
+	disp_lcm_path_lock(0, pgc->plcm);
+#endif
 	disp_sw_mutex_unlock(&(pgc->capture_lock));
 	_primary_path_switch_dst_unlock();
 
@@ -5031,6 +5079,13 @@ int primary_display_resume(void)
 	DISPCHECK("%s begin\n", __func__);
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 		MMPROFILE_FLAG_START, 0, 0);
+#if defined(CONFIG_SMCDSD_PANEL)
+/*
+ *	@ disp_lcm_path_lock
+ *	LCM lock -> primary display lock.
+ */
+	disp_lcm_path_lock(1, pgc->plcm);
+#endif
 	_primary_path_lock(__func__);
 	if (pgc->state == DISP_ALIVE) {
 		primary_display_lcm_power_on_state(1);
@@ -5080,6 +5135,11 @@ int primary_display_resume(void)
 		mipi_dsi_rx_mac_init(DISP_BDG_DSI0, data_config, NULL);
 	}
 
+#if defined(CONFIG_SMCDSD_PANEL)
+	if ((primary_display_get_power_mode_nolock() == FB_RESUME) ||
+		(primary_display_get_power_mode_nolock() == DOZE))
+		disp_lcm_power_enable(pgc->plcm, 1);
+#endif
 #ifdef CONFIG_MTK_HIGH_FRAME_RATE
 	/*DynFPS*/
 	/* whether need init cfg*/
@@ -5148,7 +5208,12 @@ int primary_display_resume(void)
 		mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 			MMPROFILE_FLAG_PULSE, 1, 2);
 		lcm_param = disp_lcm_get_params(pgc->plcm);
-
+		if (def_data_rate != 0) {
+			lcm_param->dsi.data_rate = def_data_rate;
+			lcm_param->dsi.PLL_CLOCK = def_data_rate / 2;
+		}
+		if (def_dsi_hbp != 0)
+			lcm_param->dsi.horizontal_backporch = def_dsi_hbp;
 		data_config = dpmgr_path_get_last_config(pgc->dpmgr_handle);
 		memcpy(&(data_config->dispif_config), lcm_param,
 			sizeof(struct LCM_PARAMS));
@@ -5318,6 +5383,10 @@ int primary_display_resume(void)
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 		MMPROFILE_FLAG_PULSE, 0, 9);
 
+#if defined(CONFIG_SMCDSD_PANEL)
+	/* From now, MIPI TX command will be written via CMDQ engine */
+	disp_lcm_cmdq(pgc->plcm, 1);
+#endif
 	/* primary_display_diagnose(); */
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 		MMPROFILE_FLAG_PULSE, 0, 10);
@@ -5341,8 +5410,13 @@ int primary_display_resume(void)
 			/* refresh black picture of ovl bg */
 			_trigger_display_interface(1, NULL, 0);
 			DISPINFO("[POWER]triggger cmdq[end]\n");
+#if defined(CONFIG_SMCDSD_PANEL)
+			dpmgr_wait_event_timeout(pgc->dpmgr_handle,
+				DISP_PATH_EVENT_FRAME_DONE, 33);
+#else
 			/* wait for one frame for pms workarround!!!! */
 			mdelay(33);
+#endif
 		}
 	}
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
@@ -5417,6 +5491,9 @@ done:
 	lock_primary_wake_lock(1);
 
 	_primary_path_unlock(__func__);
+#if defined(CONFIG_SMCDSD_PANEL)
+	disp_lcm_path_lock(0, pgc->plcm);
+#endif
 	DISPMSG("skip_update:%d\n", skip_update);
 
 #if 0
@@ -5424,6 +5501,9 @@ done:
 	aee_kernel_wdt_kick_Powkey_api("mtkfb_late_resume",
 		WDT_SETBY_Display);
 #endif
+#endif
+#if defined(CONFIG_MTK_VSYNC_PRINT)
+	disp_register_irq_callback(vsync_print_handler);
 #endif
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 		MMPROFILE_FLAG_END, 0, 0);
@@ -6488,6 +6568,18 @@ static void _ovl_sbch_invalid_config(struct cmdqRecStruct *cmdq_handle)
 	}
 }
 
+int cam_max_bw;
+
+void set_cam_max_bw(int bw)
+{
+	cam_max_bw = bw;
+}
+
+static int get_cam_max_bw(void)
+{
+	return cam_max_bw;
+}
+
 static int _config_ovl_input(struct disp_frame_cfg_t *cfg,
 			     disp_path_handle disp_handle,
 			     struct cmdqRecStruct *cmdq_handle)
@@ -6578,6 +6670,11 @@ static int _config_ovl_input(struct disp_frame_cfg_t *cfg,
 	}
 
 	hrt_level = HRT_GET_DVFS_LEVEL(cfg->overlap_layer_num);
+	if (get_cam_max_bw() > 50) {
+		hrt_level++;
+		DISPMSG("receive camera max bw=%d hrt_level:%d\n",
+			get_cam_max_bw(), hrt_level);
+	}
 	data_config->overlap_layer_num = hrt_level;
 
 #if 0
@@ -9782,8 +9879,14 @@ static struct DDP_MODULE_DRIVER *ddp_module_backup;
  */
 int display_vsync_switch_to_dsi(unsigned int flg)
 {
-	if (!primary_display_is_video_mode())
+	if (!primary_display_is_video_mode()) {
+	/* Handling for CMD mode */
+		if (flg)
+			is_tui_started = true;
+		else
+			is_tui_started = false;
 		return 0;
+	}
 
 	if (!flg) {
 		dpmgr_map_event_to_irq(pgc->dpmgr_handle,
@@ -9899,6 +10002,11 @@ int display_exit_tui(void)
 	DISPMSG("TDDP: %s\n", __func__);
 	pr_info("[TUI-HAL] %s() done\n", __func__);
 	return 0;
+}
+
+bool primary_display_is_tui_started(void)
+{
+	return is_tui_started;
 }
 
 void ddp_irq_callback(enum DISP_MODULE_ENUM module, unsigned int reg_value)
@@ -10289,6 +10397,7 @@ void primary_display_dynfps_chg_fps(int cfg_id)
 
 		cmdqRecFlushAsync(qhandle);
 		/*cmdqRecFlush(qhandle);*/
+		cmdqRecDestroy(qhandle);
 
 	} else if (fps_change_index & DYNFPS_DSI_VFP) {
 
@@ -10335,8 +10444,30 @@ void primary_display_dynfps_chg_fps(int cfg_id)
 				cmdqRecFlush(qhandle);
 			}
 		}
+		cmdqRecDestroy(qhandle);
+	} else {
+		ret = cmdqRecCreate(
+			CMDQ_SCENARIO_DISP_ESD_CHECK, &qhandle);
+		if (ret) {
+			DISPCHECK("%s,cmdq create fail!\n", __func__);
+			mmprofile_log_ex(ddp_mmp_get_events()->primary_switch_fps,
+				MMPROFILE_FLAG_END, 0, 2);
+			return;
+		}
+
+		cmdqRecReset(qhandle);
+		/* wait and clear EOF */
+		cmdqRecWait(qhandle, CMDQ_SYNC_TOKEN_STREAM_EOF);
+
+		if (need_send_cmd) {
+			DISPMSG("%s,send cmd to lcm\n", __func__);
+			disp_lcm_dynfps_send_cmd(pgc->plcm, qhandle,
+				last_dynfps, new_dynfps);
+		}
+		cmdqRecSetEventToken(qhandle, CMDQ_SYNC_TOKEN_STREAM_EOF);
+		cmdqRecFlushAsync(qhandle);
+		cmdqRecDestroy(qhandle);
 	}
-	cmdqRecDestroy(qhandle);
 	/*3, inform fps go directly*/
 	disp_invoke_fps_chg_callbacks(new_dynfps / 100);
 
@@ -10350,7 +10481,9 @@ void primary_display_dynfps_chg_fps(int cfg_id)
 	pgc->lcm_fps = new_dynfps;
 
 	DISPMSG("%s,done\n", __func__);
-
+	mtk_notifier_call_chain(MTK_FPS_CHANGE, (void *)&pgc->lcm_refresh_rate);
+	mmprofile_log_ex(ddp_mmp_get_events()->primary_switch_fps,
+		MMPROFILE_FLAG_END, 0, 3);
 }
 
 void primary_display_dynfps_get_vfp_info(

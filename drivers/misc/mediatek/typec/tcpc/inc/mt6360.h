@@ -112,6 +112,10 @@ enum mt6360_id_rupsel {
 
 #define MT6360_REG_DEBOUNCE_CTRL4			(0xE5)
 #define MT6360_REG_CTD_CTRL2				(0xEC)
+#if defined(CONFIG_USB_FACTORY_MODE)
+/* [ALPS07177780] battery: factory higher sleep current by charger buck mode*/
+#define MT6360_REG_CC_CTRL5				(0xED)
+#endif
 
 /*
  * Device ID
@@ -201,6 +205,7 @@ enum mt6360_id_rupsel {
  * MT6360_REG_MT_MASK1				(0x91)
  */
 
+#define MT6360_M_VBUS_VALID			BIT(5)
 #define MT6360_M_VCONN_SHT_GND			BIT(3)
 #define MT6360_M_VBUS_SAFE0V			BIT(1)
 #define MT6360_M_WAKEUP				BIT(0)
@@ -253,6 +258,7 @@ enum mt6360_id_rupsel {
  * MT6360_REG_MT_ST1				(0x9B)
  */
 
+#define MT6360_ST_VBUS_VALID			BIT(5)
 #define MT6360_ST_VCONN_SHT_GND			BIT(3)
 #define MT6360_ST_VBUS_SAFE0V			BIT(1)
 
@@ -341,6 +347,14 @@ enum mt6360_id_rupsel {
 #define MT6360_REG_WD_DET_CTRL5_SET(time) \
 	(time & MT6360_WD_SLEEP_TIME)
 
+#if defined(CONFIG_USB_FACTORY_MODE)
+/* [ALPS07177780] battery: factory higher sleep current by charger buck mode*/
+/*
+ * MT6360_REG_WD_DET_CTRL7			(0xC6)
+ */
+#define MT6360_DRP_AUTO_EN			BIT(7)
+#endif
+
 /*
  * MT6360_REG_RX_CTRL2				(0xCF)
  */
@@ -378,6 +392,14 @@ enum mt6360_id_rupsel {
 #define MT6360_DIS_RPDET			BIT(7)
 #define MT6360_RPDET_ONESHOT			BIT(6)
 
+#if defined(CONFIG_USB_FACTORY_MODE)
+/* [ALPS07177780] battery: factory higher sleep current by charger buck mode*/
+/*
+ * MT6360_REG_CC_CTRL5				(0xED)
+ */
+#define MT6360_MASK_LPWR_RPRD_CC2_CC1		(0xF0)
+#endif
+
 #if ENABLE_MT6360_DBG
 #define MT6360_INFO(format, args...) \
 	pd_dbg_info("%s() line-%d: " format,\
@@ -385,5 +407,9 @@ enum mt6360_id_rupsel {
 #else
 #define MT6360_INFO(foramt, args...)
 #endif /* ENABLE_MT6360_DBG */
+
+#if IS_ENABLED(CONFIG_PDIC_NOTIFIER)
+extern int mt6360_usbid_check(void);
+#endif	/* CONFIG_PDIC_NOTIFIER */
 
 #endif /* #ifndef __LINUX_MT6360_H */

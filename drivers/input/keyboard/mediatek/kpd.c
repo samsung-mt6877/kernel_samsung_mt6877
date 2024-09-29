@@ -142,6 +142,40 @@ void vol_down_long_press(unsigned long pressed)
 #endif
 /*****************************************/
 
+#if defined(PMIC_KEY_STATUS)
+unsigned int kpd_pwrkey_pmic_status(void)
+{
+	unsigned int pressed;
+
+	pressed = kpd_pmic_pwrkey_status_hal();
+	pr_info("[%s] %s power key\n", __func__, pressed ? "pressed" : "released");
+
+	return pressed;
+}
+
+unsigned int kpd_homekey_pmic_status(void)
+{
+	unsigned int pressed;
+
+	pressed = kpd_pmic_homekey_status_hal();
+	pr_info("[%s] %s home key\n", __func__, pressed ? "pressed" : "released");
+
+	return pressed;
+}
+#endif
+
+#if defined(CONFIG_SEC_DEBUG) && !defined(CONFIG_KEYBOARD_MTK_PMIC)
+int mtk_pmic_pwrkey_status(void)
+{
+	return kpd_pwrkey_pmic_status();
+}
+
+int mtk_pmic_homekey_status(void)
+{
+	return kpd_homekey_pmic_status();
+}
+#endif
+
 #ifdef CONFIG_KPD_PWRKEY_USE_PMIC
 void kpd_pwrkey_pmic_handler(unsigned long pressed)
 {

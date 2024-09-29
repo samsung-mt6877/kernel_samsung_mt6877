@@ -128,7 +128,7 @@ enum SENINF_RETURN seninf_clk_init(struct SENINF_CLK *pclk)
 	pclk->seninf_wake_lock = wakeup_source_register(
 			NULL, "seninf_lock_wakelock");
 	if (!pclk->seninf_wake_lock) {
-		pr_info("failed to get seninf_wake_lock\n");
+		PK_PR_ERR("failed to get seninf_wake_lock\n");
 		return SENINF_RETURN_ERROR;
 	}
 #endif
@@ -160,13 +160,17 @@ int seninf_clk_set(struct SENINF_CLK *pclk,
 		return -EFAULT;
 	}
 
-	PK_DBG("[CAMERA SENSOR] CCF kdSetSensorMclk on= %d, freq= %d, TG= %d\n",
+	PK_INFO("[CAMERA SENSOR] CCF kdSetSensorMclk on= %d, freq= %d, TG= %d\n",
 	       pmclk->on, pmclk->freq, pmclk->TG);
 
 	seninf_clk_check(pclk);
 
-	for (i = 0; pmclk->freq != gseninf_clk_freq[i]; i++)
+	for (i = 0; ((i < SENINF_CLK_IDX_FREQ_IDX_NUM) &&
+			(pmclk->freq != gseninf_clk_freq[i])); i++)
 		;
+
+	if (i >= SENINF_CLK_IDX_FREQ_IDX_NUM)
+		return -EFAULT;
 
 	idx_tg = pmclk->TG + SENINF_CLK_IDX_TG_MIN_NUM;
 	idx_freq = i + SENINF_CLK_IDX_FREQ_MIN_NUM;
@@ -225,7 +229,7 @@ void seninf_clk_open(struct SENINF_CLK *pclk)
 {
 	MINT32 i;
 
-	PK_DBG("open\n");
+	PK_INFO("open - E");
 
 	if (atomic_inc_return(&pclk->wakelock_cnt) == 1) {
 #ifdef CONFIG_PM_SLEEP
@@ -241,19 +245,21 @@ void seninf_clk_open(struct SENINF_CLK *pclk)
 		else
 			atomic_inc(&pclk->enable_cnt[i]);
 	}
+	PK_INFO("open - X");
 }
 
 void seninf_clk_release(struct SENINF_CLK *pclk)
 {
 	MINT32 i = SENINF_CLK_IDX_MAX_NUM;
 
-	PK_DBG("release\n");
+	PK_INFO("release - E");
 
 	do {
 		i--;
 		for (; atomic_read(&pclk->enable_cnt[i]) > 0;) {
 			clk_disable_unprepare(pclk->mclk_sel[i]);
 			atomic_dec(&pclk->enable_cnt[i]);
+			PK_DBG("enable_cnt[%d]: %d", i, atomic_read(&pclk->enable_cnt[i]));
 		}
 	} while (i);
 
@@ -262,6 +268,7 @@ void seninf_clk_release(struct SENINF_CLK *pclk)
 		__pm_relax(pclk->seninf_wake_lock);
 #endif
 	}
+	PK_INFO("release - X");
 }
 
 unsigned int seninf_clk_get_meter(struct SENINF_CLK *pclk, unsigned int clk)
@@ -270,7 +277,7 @@ unsigned int seninf_clk_get_meter(struct SENINF_CLK *pclk, unsigned int clk)
 
 	if (clk == 0xff) {
 		for (i = SENINF_CLK_IDX_SYS_MIN_NUM; i < SENINF_CLK_IDX_SYS_MAX_NUM; ++i) {
-			PK_DBG("[sensor_dump][mclk]index=%u freq=%lu HW enable=%d enable_cnt=%u\n",
+			PK_INFO("[sensor_dump][mclk]index=%u freq=%lu HW enable=%d enable_cnt=%u\n",
 				i,
 				clk_get_rate(pclk->mclk_sel[i]),
 				__clk_is_enabled(pclk->mclk_sel[i]),
@@ -284,10 +291,10 @@ unsigned int seninf_clk_get_meter(struct SENINF_CLK *pclk, unsigned int clk)
 	mt_get_ckgen_freq(1);
 
 	if (clk == 4) {
-		PK_DBG("CAMSYS_SENINF_CGPDN = %lu\n",
+		PK_INFO("CAMSYS_SENINF_CGPDN = %lu\n",
 		clk_get_rate(
 		pclk->mclk_sel[SENINF_CLK_IDX_SYS_CAMSYS_SENINF_CGPDN]));
-		PK_DBG("TOP_MUX_SENINF = %lu\n",
+		PK_INFO("TOP_MUX_SENINF = %lu\n",
 			clk_get_rate(
 			pclk->mclk_sel[SENINF_CLK_IDX_SYS_TOP_MUX_SENINF]));
 	}

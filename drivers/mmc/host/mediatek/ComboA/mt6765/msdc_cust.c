@@ -299,7 +299,7 @@ void msdc_sd_power(struct msdc_host *host, u32 on)
 				host->mmc->supply.vmmc, &sd_oc.nb);
 
 		/* VMCH VOLSEL */
-		msdc_ldo_power(card_on, host->mmc->supply.vmmc, VOL_3000,
+		msdc_ldo_power(card_on, host->mmc->supply.vmmc, VOL_2950,
 			&host->power_flash);
 
 		/* Enable VMCH OC */
@@ -309,7 +309,7 @@ void msdc_sd_power(struct msdc_host *host, u32 on)
 				&sd_oc.nb);
 		}
 
-		msdc_ldo_power(on, host->mmc->supply.vqmmc, VOL_3000,
+		msdc_ldo_power(on, host->mmc->supply.vqmmc, VOL_2950,
 			&host->power_io);
 
 		if (on)
@@ -449,6 +449,9 @@ void msdc_HQA_set_voltage(struct msdc_host *host)
 	vio18_cal = 0;
 #endif
 
+	pmic_config_interface(REG_VCORE_VOSEL_SW, vcore,
+		VCORE_VOSEL_SW_MASK, VCORE_VOSEL_SW_SHIFT);
+
 	if (vio18_cal)
 		pmic_config_interface(REG_VIO_VOCAL_SW, vio18_cal,
 			VIO_VOCAL_SW_MASK, VIO_VOCAL_SW_SHIFT);
@@ -481,6 +484,7 @@ u32 *hclks_msdc;
 int msdc_get_ccf_clk_pointer(struct platform_device *pdev,
 	struct msdc_host *host)
 {
+	u32 clk_freq;
 	static char const * const clk_names[] = {
 		MSDC0_CLK_NAME, MSDC1_CLK_NAME, MSDC3_CLK_NAME
 	};
@@ -509,6 +513,11 @@ int msdc_get_ccf_clk_pointer(struct platform_device *pdev,
 		pr_notice("[msdc%d] can not prepare hclock control\n",
 			pdev->id);
 		return 1;
+	}
+	if (host->clk_ctl) {
+		clk_freq = clk_get_rate(host->clk_ctl);
+		if (clk_freq > 0)
+			host->hclk = clk_freq;
 	}
 
 #if defined(CONFIG_MTK_HW_FDE) || defined(CONFIG_MMC_CRYPTO)

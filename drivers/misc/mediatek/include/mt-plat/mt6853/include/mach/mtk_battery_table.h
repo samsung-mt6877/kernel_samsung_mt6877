@@ -23,7 +23,7 @@
 #define Q_MAX_H_CURRENT 10000
 
 /* multiple battery profile compile options */
-/*#define MTK_GET_BATTERY_ID_BY_AUXADC*/
+#define MTK_GET_BATTERY_ID_BY_GPIO
 
 
 /* if ACTIVE_TABLE == 0 && MULTI_BATTERY == 0

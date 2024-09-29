@@ -10,7 +10,11 @@
 
 #define RT_MAX_NUM 10
 #define ESD_CHECK_NUM 3
+#if defined(CONFIG_SMCDSD_PANEL)
+#define MAX_TX_CMD_NUM 30
+#else
 #define MAX_TX_CMD_NUM 20
+#endif
 #define MAX_RX_CMD_NUM 20
 #define READ_DDIC_SLOT_NUM (4 * MAX_RX_CMD_NUM)
 #define MAX_DYN_CMD_NUM 20
@@ -20,7 +24,7 @@ struct mtk_dsi;
 struct cmdq_pkt;
 struct mtk_panel_para_table {
 	u8 count;
-	u8 para_list[64];
+	u8 para_list[510];
 };
 
 /*
@@ -221,6 +225,9 @@ struct dynamic_fps_params {
 };
 
 struct mtk_panel_params {
+#if defined(CONFIG_SMCDSD_PANEL)
+	struct drm_panel *dpanel;
+#endif
 	unsigned int pll_clk;
 	unsigned int data_rate;
 	struct mtk_dsi_phy_timcon phy_timcon;
@@ -279,8 +286,15 @@ struct mtk_panel_ctx {
 };
 
 struct mtk_panel_funcs {
+#if defined(CONFIG_SMCDSD_PANEL)
+	int (*late_register)(struct drm_panel *panel);
+	int (*set_power)(struct drm_panel *panel, int power);
+	int (*crtc_state_notify)(struct drm_panel *panel, int active, int prepare);
+	int (*framedone_notify)(struct drm_panel *panel);
+#endif
 	int (*set_backlight_cmdq)(void *dsi_drv, dcs_write_gce cb,
 		void *handle, unsigned int level);
+	int (*set_dispon_cmdq)(struct drm_panel *panel);
 	int (*set_aod_light_mode)(void *dsi_drv, dcs_write_gce cb,
 		void *handle, unsigned int mode);
 	int (*set_backlight_grp_cmdq)(void *dsi_drv, dcs_grp_write_gce cb,
@@ -349,6 +363,7 @@ struct mtk_panel_funcs {
 
 	int (*hbm_set_cmdq)(struct drm_panel *panel, void *dsi_drv,
 			    dcs_write_gce cb, void *handle, bool en);
+	int (*hbm_set_lcm_cmdq)(struct drm_panel *panel, bool en);
 	void (*hbm_get_state)(struct drm_panel *panel, bool *state);
 	void (*hbm_get_wait_state)(struct drm_panel *panel, bool *wait);
 	bool (*hbm_set_wait_state)(struct drm_panel *panel, bool wait);

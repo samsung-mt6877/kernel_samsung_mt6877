@@ -23,6 +23,10 @@
 #include <linux/usb/otg.h>
 #include <linux/usb/role.h>
 
+#if defined(CONFIG_BATTERY_SAMSUNG)
+#include "../../battery/common/sec_charging_common.h"
+#endif
+
 struct mtu3;
 struct mtu3_ep;
 struct mtu3_request;
@@ -426,6 +430,12 @@ struct mtu3 {
 
 	unsigned is_gadget_ready:1;
 	int ep_slot_mode;
+	unsigned usb_bootcomplete:1;
+
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	struct work_struct set_vbus_current_work;
+	int	vbus_current; /* 100mA,  500mA,  900mA */
+#endif
 };
 
 static inline struct mtu3 *gadget_to_mtu3(struct usb_gadget *g)
@@ -518,9 +528,5 @@ void mtu3_device_disable(struct mtu3 *mtu);
 int ssusb_set_power_resource(struct ssusb_mtk *ssusb, int mode);
 irqreturn_t mtu3_ep0_isr(struct mtu3 *mtu);
 extern const struct usb_ep_ops mtu3_ep0_ops;
-
-#if IS_ENABLED(CONFIG_MACH_MT6771)
-extern void slp_set_infra_on(bool infra_on);
-#endif
 
 #endif

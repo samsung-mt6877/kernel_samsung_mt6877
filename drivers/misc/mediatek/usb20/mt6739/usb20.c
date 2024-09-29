@@ -26,6 +26,10 @@
 
 #include <mt-plat/mtk_boot_common.h>
 
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+#include <linux/usb_notify.h>
+#endif
+
 MODULE_LICENSE("GPL v2");
 
 struct musb *mtk_musb;
@@ -605,11 +609,8 @@ static void mt_usb_enable(struct musb *musb)
 
 	flags = musb_readl(musb->mregs, USB_L1INTM);
 
-	/* only host mode need phy_power_on here*/
-	if(mtk_musb->is_host) {
-		DBG(0, "phy_power_on - host mode\n");
-		phy_power_on(glue->phy);
-	}
+	DBG(0, "phy_power_on\n");
+	phy_power_on(glue->phy);
 
 	/* update musb->power & mtk_usb_power in the same time */
 	musb->power = true;
@@ -633,11 +634,8 @@ static void mt_usb_disable(struct musb *musb)
 	if (musb->power == false)
 		return;
 
-	/* only host mode need phy_power_off here*/
-	if(mtk_musb->is_host) {
-		DBG(0, "phy_power_off - host mode\n");
-		phy_power_off(glue->phy);
-	}
+	DBG(0, "phy_power_off\n");
+	phy_power_off(glue->phy);
 
 	usb_enable_clock(false);
 	/* clock will unprepare when leave here */
@@ -756,8 +754,12 @@ void do_connection_work(struct work_struct *data)
 	/* clk_prepare_cnt +1 here*/
 	usb_prepare_clock(true);
 
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+	usb_connected = usb_cable_connected();
+#else
 	/* be aware this could not be used in non-sleep context */
 	usb_connected = mtk_musb->usb_connected;
+#endif
 
 	/* additional check operation here */
 	if (musb_force_on)
@@ -936,6 +938,22 @@ void mt_usb_connect_test(int start)
 }
 
 /* be aware this could not be used in non-sleep context */
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+bool usb_cable_connected(void)
+{
+	struct otg_notify *usb_notify;
+	int usb_mode = 0;
+
+	usb_notify = get_otg_notify();
+	usb_mode = get_usb_mode(usb_notify);
+	pr_info("usb: %s: %d\n", __func__, usb_mode);
+	if (usb_mode == NOTIFY_PERIPHERAL_MODE)
+		return true;
+	else
+		return false;
+
+}
+#else
 bool usb_cable_connected(struct musb *musb)
 {
 	if (musb->usb_connected)
@@ -943,6 +961,7 @@ bool usb_cable_connected(struct musb *musb)
 	else
 		return false;
 }
+#endif
 
 void musb_platform_reset(struct musb *musb)
 {
