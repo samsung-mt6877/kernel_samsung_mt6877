@@ -320,7 +320,7 @@ include scripts/subarch.include
 # Default value for CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 ARCH            ?= arm64
-CROSS_COMPILE   ?= $(srctree)/toolchain/clang/host/linux-x86/clang-r383902/bin/aarch64-linux-gnu-
+CROSS_COMPILE   ?= $(CROSS_COMPILE)
 
 # Architecture as present in compile.h
 UTS_MACHINE 	:= $(ARCH)
@@ -386,7 +386,7 @@ READELF		= llvm-readelf
 OBJSIZE		= llvm-size
 STRIP		= llvm-strip
 else
-CC		= $(srctree)/toolchain/clang/host/linux-x86/clang-r383902/bin/clang
+CC		= $(CROSS_COMPILE)gcc
 LD		= $(CROSS_COMPILE)ld
 AR		= $(CROSS_COMPILE)ar
 NM		= $(CROSS_COMPILE)nm
