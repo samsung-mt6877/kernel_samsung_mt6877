@@ -18,6 +18,9 @@ struct mtk_spk_i2c_ctrl {
 
 enum mtk_spk_type {
 	MTK_SPK_NOT_SMARTPA = 0,
+#ifdef CONFIG_SND_SOC_SMA1303
+	MTK_SPK_SILICON_SM1303,
+#endif
 	MTK_SPK_RICHTEK_RT5509,
 #if defined(CONFIG_SND_SOC_TAS5782M)
 	MTK_SPK_TI_TAS5782M,

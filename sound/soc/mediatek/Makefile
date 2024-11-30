@@ -113,7 +113,7 @@ subdir-ccflags-y += -DSND_SOC_AW87519
 endif
 
 # include path
-subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/accdet/mt6358
+subdir-ccflags-y += -I$(srctree)/sound/soc/codecs/
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
 subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat

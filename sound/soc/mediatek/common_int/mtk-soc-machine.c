@@ -692,10 +692,20 @@ static struct snd_soc_dai_link
 			     ARRAY_SIZE(mt_soc_exthp_dai) +
 			     ARRAY_SIZE(mt_soc_extspk_dai)];
 
+#ifdef CONFIG_SND_SOC_MT6357_ACCDET
+static struct snd_soc_aux_dev mtk_aux_devs = {
+	.name = "mtk-headset",
+};
+#endif
+
 static struct snd_soc_card mt_snd_soc_card_mt = {
 	.name = "mt-snd-card",
 	.dai_link = mt_soc_dai_common,
 	.num_links = ARRAY_SIZE(mt_soc_dai_common),
+#ifdef CONFIG_SND_SOC_MT6357_ACCDET
+	.aux_dev = &mtk_aux_devs,
+	.num_aux_devs = 1,
+#endif
 };
 
 static int mt_soc_snd_probe(struct platform_device *pdev)
@@ -752,6 +762,15 @@ static int mt_soc_snd_probe(struct platform_device *pdev)
 	card->dev = &pdev->dev;
 	platform_set_drvdata(pdev, card);
 
+#ifdef CONFIG_SND_SOC_MT6357_ACCDET
+	mtk_aux_devs.codec_of_node = of_parse_phandle(pdev->dev.of_node,
+						 "mediatek,headset-codec", 0);
+	if (!mtk_aux_devs.codec_of_node) {
+		dev_err(&pdev->dev, "Can't find controls for headset codec.\n");
+		return -EINVAL;
+	};
+	mtk_accdet_set_drvdata(card);
+#endif
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret)
 		dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",

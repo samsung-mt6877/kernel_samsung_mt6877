@@ -114,6 +114,7 @@ enum soc_aud_afe_io_block {
 	Soc_Aud_AFE_IO_Block_ADDA_UL_RCH,
 	/* I2S */
 	Soc_Aud_AFE_IO_Block_I2S0,
+	Soc_Aud_AFE_IO_Block_I2S0_CH1,
 	Soc_Aud_AFE_IO_Block_I2S0_CH2,
 	Soc_Aud_AFE_IO_Block_I2S1_DAC,
 	Soc_Aud_AFE_IO_Block_I2S1_DAC_2,
