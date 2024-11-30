@@ -208,6 +208,19 @@ bool SetModem2InCh1ToI2s3(unsigned int ConnectionState)
 			   Soc_Aud_InterConnectionOutput_O01);
 	return true;
 }
+bool SetI2s0Ch1ToModem1OutCh4(unsigned int ConnectionState)
+{
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I00,
+			   Soc_Aud_InterConnectionOutput_O27);
+	return true;
+}
+
+bool SetI2s0Ch1ToModem2OutCh4(unsigned int ConnectionState)
+{
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I00,
+			   Soc_Aud_InterConnectionOutput_O24);
+	return true;
+}
 
 bool SetI2s0Ch2ToModem1OutCh4(unsigned int ConnectionState)
 {
@@ -282,6 +295,24 @@ bool SetConnsysToHwGain1Out(unsigned int ConnectionState)
 	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I34,
 			   Soc_Aud_InterConnectionOutput_O13);
 	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I35,
+			   Soc_Aud_InterConnectionOutput_O14);
+	return true;
+}
+
+bool SetDLToHwGain1Out(unsigned int ConnectionState)
+{
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I05,
+			   Soc_Aud_InterConnectionOutput_O13);
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I06,
+			   Soc_Aud_InterConnectionOutput_O14);
+	return true;
+}
+
+bool SetDL2ToHwGain1Out(unsigned int ConnectionState)
+{
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I07,
+			   Soc_Aud_InterConnectionOutput_O13);
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I08,
 			   Soc_Aud_InterConnectionOutput_O14);
 	return true;
 }
@@ -711,6 +742,28 @@ bool SetI2s2ToawbData2(unsigned int ConnectionState)
 
 	return true;
 }
+
+#ifdef CONFIG_MTK_TC10_FEATURE
+bool SetConnsysToHwGain2Out(uint32_t ConnectionState)
+{
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I34,
+			   Soc_Aud_InterConnectionOutput_O15);
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I35,
+			   Soc_Aud_InterConnectionOutput_O16);
+	return true;
+}
+
+bool SetHwGain2InToVul2(uint32_t ConnectionState)
+{
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I12,
+			   Soc_Aud_InterConnectionOutput_O32);
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I13,
+			   Soc_Aud_InterConnectionOutput_O33);
+	return true;
+}
+
+#endif
+
 struct connection_link_t {
 	unsigned int input;
 	unsigned int output;
@@ -744,6 +797,10 @@ static const struct connection_link_t mConnectionLink[] = {
 	 Soc_Aud_AFE_IO_Block_I2S3, SetModem1InCh1ToI2s3},
 	{Soc_Aud_AFE_IO_Block_MODEM_PCM_2_I_CH1,
 	 Soc_Aud_AFE_IO_Block_I2S3, SetModem2InCh1ToI2s3},
+	{Soc_Aud_AFE_IO_Block_I2S0_CH1,
+	 Soc_Aud_AFE_IO_Block_MODEM_PCM_1_O_CH4, SetI2s0Ch1ToModem1OutCh4},
+	{Soc_Aud_AFE_IO_Block_I2S0_CH1,
+	 Soc_Aud_AFE_IO_Block_MODEM_PCM_2_O_CH4, SetI2s0Ch1ToModem2OutCh4},
 	{Soc_Aud_AFE_IO_Block_I2S0_CH2,
 	 Soc_Aud_AFE_IO_Block_MODEM_PCM_1_O_CH4, SetI2s0Ch2ToModem1OutCh4},
 	{Soc_Aud_AFE_IO_Block_I2S0_CH2,
@@ -758,6 +815,10 @@ static const struct connection_link_t mConnectionLink[] = {
 	 Soc_Aud_AFE_IO_Block_HW_GAIN1_OUT, SetI2s0ToHwGain1Out},
 	{Soc_Aud_AFE_IO_Block_I2S_CONNSYS,
 	 Soc_Aud_AFE_IO_Block_HW_GAIN1_OUT, SetConnsysToHwGain1Out},
+	{Soc_Aud_AFE_IO_Block_MEM_DL1,
+	 Soc_Aud_AFE_IO_Block_HW_GAIN1_OUT, SetDLToHwGain1Out},
+	{Soc_Aud_AFE_IO_Block_MEM_DL2,
+	 Soc_Aud_AFE_IO_Block_HW_GAIN1_OUT, SetDL2ToHwGain1Out},
 	{Soc_Aud_AFE_IO_Block_HW_GAIN1_IN,
 	 Soc_Aud_AFE_IO_Block_I2S1_DAC, SetHwGain1InToI2s1Dac},
 	{Soc_Aud_AFE_IO_Block_HW_GAIN1_IN,
@@ -844,14 +905,20 @@ static const struct connection_link_t mConnectionLink[] = {
 	Soc_Aud_AFE_IO_Block_MEM_AWB2,
 	 SetI2s0ToawbData2},
 	{Soc_Aud_AFE_IO_Block_I2S2,
-	 Soc_Aud_AFE_IO_Block_MEM_AWB2, SetI2s2ToawbData2}
+	 Soc_Aud_AFE_IO_Block_MEM_AWB2, SetI2s2ToawbData2},
+#ifdef CONFIG_MTK_TC10_FEATURE
+	{Soc_Aud_AFE_IO_Block_I2S_CONNSYS,
+	 Soc_Aud_AFE_IO_Block_HW_GAIN2_OUT, SetConnsysToHwGain2Out},
+	{Soc_Aud_AFE_IO_Block_HW_GAIN2_IN,
+	 Soc_Aud_AFE_IO_Block_MEM_VUL2, SetHwGain2InToVul2}
+#endif
 };
 
 static const int CONNECTION_LINK_NUM = ARRAY_SIZE(mConnectionLink);
 
-static bool CheckBitsandReg(unsigned int regaddr, char bits)
+static bool CheckBitsandReg(short regaddr, char bits)
 {
-	if (regaddr == 0 || bits < 0) {
+	if (regaddr <= 0 || bits < 0) {
 		pr_debug("regaddr = %x bits = %d\n", regaddr, bits);
 		return false;
 	}
@@ -881,7 +948,7 @@ bool SetConnectionState(unsigned int ConnectionState, unsigned int Input,
 	 * pr_debug("SetinputConnection ConnectionState = %d
 	 * Input = %d Output = %d\n", ConnectionState, Input, Output);
 	 */
-	unsigned int connectReg = 0;
+	int connectReg = 0;
 	int set_bit = 0;
 
 	connectReg = (Input < Soc_Aud_InterConnectionInput_I32

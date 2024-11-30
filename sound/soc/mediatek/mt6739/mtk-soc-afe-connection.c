@@ -710,6 +710,28 @@ bool SetI2s2ToawbData2(unsigned int ConnectionState)
 
 	return true;
 }
+
+#ifdef CONFIG_MTK_TC10_FEATURE
+bool SetConnsysToHwGain2Out(uint32_t ConnectionState)
+{
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I34,
+			   Soc_Aud_InterConnectionOutput_O15);
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I35,
+			   Soc_Aud_InterConnectionOutput_O16);
+	return true;
+}
+
+bool SetHwGain2InToVul2(uint32_t ConnectionState)
+{
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I12,
+			   Soc_Aud_InterConnectionOutput_O32);
+	SetConnectionState(ConnectionState, Soc_Aud_InterConnectionInput_I13,
+			   Soc_Aud_InterConnectionOutput_O33);
+	return true;
+}
+
+#endif
+
 struct connection_link_t {
 	unsigned int input;
 	unsigned int output;
@@ -840,10 +862,16 @@ static const struct connection_link_t mConnectionLink[] = {
 	{Soc_Aud_AFE_IO_Block_I2S2,
 	 Soc_Aud_AFE_IO_Block_MODEM_PCM_2_O_CH4, SetI2s2ToModem2OutCh4},
 	{Soc_Aud_AFE_IO_Block_I2S0,
-	Soc_Aud_AFE_IO_Block_MEM_AWB2,
+	 Soc_Aud_AFE_IO_Block_MEM_AWB2,
 	 SetI2s0ToawbData2},
 	{Soc_Aud_AFE_IO_Block_I2S2,
-	 Soc_Aud_AFE_IO_Block_MEM_AWB2, SetI2s2ToawbData2}
+	 Soc_Aud_AFE_IO_Block_MEM_AWB2, SetI2s2ToawbData2},
+#ifdef CONFIG_MTK_TC10_FEATURE
+	{Soc_Aud_AFE_IO_Block_I2S_CONNSYS,
+	 Soc_Aud_AFE_IO_Block_HW_GAIN2_OUT, SetConnsysToHwGain2Out},
+	{Soc_Aud_AFE_IO_Block_HW_GAIN2_IN,
+	 Soc_Aud_AFE_IO_Block_MEM_VUL2, SetHwGain2InToVul2}
+#endif
 };
 
 static const int CONNECTION_LINK_NUM = ARRAY_SIZE(mConnectionLink);

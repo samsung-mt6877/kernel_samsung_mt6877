@@ -60,6 +60,9 @@
 #if IS_ENABLED(CONFIG_MTK_PMIC_WRAP)
 #include <linux/soc/mediatek/pmic_wrap.h>
 #endif
+#ifdef CONFIG_SND_SOC_MT6357_ACCDET
+#include "../../../codecs/mt6357-accdet.h"
+#endif
 #include <linux/nvmem-consumer.h>
 
 #include "mtk-soc-speaker-amp.h"
@@ -4539,8 +4542,7 @@ static bool TurnOnADcPowerACC(int ADCType, bool enable)
 				/* Audio L preamplifier input sel :
 				 * AIN0. Enable audio L PGA
 				 */
-				Ana_Set_Reg(AUDENC_ANA_CON0, 0x0041, 0x00c1);
-				usleep_range(1000, 1020);
+				Ana_Set_Reg(AUDENC_ANA_CON0, 0x0041, 0xf0ff);
 				/* Audio L ADC input sel :
 				 * L PGA. Enable audio L ADC
 				 */
@@ -4551,8 +4553,7 @@ static bool TurnOnADcPowerACC(int ADCType, bool enable)
 				/* Audio L preamplifier input sel :
 				 * AIN1. Enable audio L PGA
 				 */
-				Ana_Set_Reg(AUDENC_ANA_CON0, 0x0081, 0x00c1);
-				usleep_range(1000, 1020);
+				Ana_Set_Reg(AUDENC_ANA_CON0, 0x0081, 0xf0ff);
 				/* Audio L ADC input sel :
 				 * L PGA. Enable audio L ADC
 				 */
@@ -4563,12 +4564,10 @@ static bool TurnOnADcPowerACC(int ADCType, bool enable)
 			/* Audio R preamplifier input sel :
 			 * AIN2. Enable audio R PGA
 			 */
-			Ana_Set_Reg(AUDENC_ANA_CON1, 0x00c1, 0x00c1);
-			usleep_range(1000, 1020);
+			Ana_Set_Reg(AUDENC_ANA_CON1, 0x00c1, 0xf0ff);
 			/* Audio R ADC input sel : R PGA. Enable audio R ADC */
 			Ana_Set_Reg(AUDENC_ANA_CON1, 0x50c1, 0xf000);
 		}
-		usleep_range(1000, 1020);
 		if (GetAdcStatus() == false) {
 			/* here to set digital part */
 			/* AdcClockEnable(true); */
@@ -4810,11 +4809,10 @@ static bool TurnOnADcPowerDCC(int ADCType, bool enable, int ECMmode)
 				/* Audio L preamplifier input sel :
 				 * AIN0. Enable audio L PGA
 				 */
-				Ana_Set_Reg(AUDENC_ANA_CON0, 0x0041, 0x00c1);
+				Ana_Set_Reg(AUDENC_ANA_CON0, 0x0041, 0xf0ff);
 				/* Audio L preamplifier DCCEN */
 				Ana_Set_Reg(AUDENC_ANA_CON0,
 					    0x1 << 1, 0x1 << 1);
-				usleep_range(1000, 1020);
 				/* Audio L ADC input sel :
 				 * L PGA. Enable audio L ADC
 				 */
@@ -4825,19 +4823,15 @@ static bool TurnOnADcPowerDCC(int ADCType, bool enable, int ECMmode)
 				/* Audio L preamplifier input sel :
 				 * AIN1. Enable audio L PGA
 				 */
-				Ana_Set_Reg(AUDENC_ANA_CON0, 0x0081, 0x00c1);
+				Ana_Set_Reg(AUDENC_ANA_CON0, 0x0081, 0xf0ff);
 				/* Audio L preamplifier DCCEN */
 				Ana_Set_Reg(AUDENC_ANA_CON0,
 					    0x1 << 1, 0x1 << 1);
-				usleep_range(1000, 1020);
 				/* Audio L ADC input sel :
 				 * L PGA. Enable audio L ADC
 				 */
 				Ana_Set_Reg(AUDENC_ANA_CON0, 0x5081, 0xf000);
 			}
-			usleep_range(1000, 1020);
-			/* Audio L preamplifier DCC precharge off */
-			Ana_Set_Reg(AUDENC_ANA_CON0, 0x0, 0x1 << 2);
 		} else if (ADCType == AUDIO_ANALOG_DEVICE_IN_ADC2) {
 			/* Audio R preamplifier DCC precharge */
 			Ana_Set_Reg(AUDENC_ANA_CON1, 0x0004, 0xf8ff);
@@ -4845,17 +4839,18 @@ static bool TurnOnADcPowerDCC(int ADCType, bool enable, int ECMmode)
 			/* Audio R preamplifier input sel :
 			 * AIN2. Enable audio R PGA
 			 */
-			Ana_Set_Reg(AUDENC_ANA_CON1, 0x00c1, 0x00c1);
+			Ana_Set_Reg(AUDENC_ANA_CON1, 0x00c1, 0xf0ff);
 			/* Audio R preamplifier DCCEN */
 			Ana_Set_Reg(AUDENC_ANA_CON1, 0x1 << 1, 0x1 << 1);
-			usleep_range(1000, 1020);
 			/* Audio R ADC input sel : R PGA Enable audio R ADC */
 			Ana_Set_Reg(AUDENC_ANA_CON1, 0x50c1, 0xf000);
-			usleep_range(1000, 1020);
-			/* Audio R preamplifier DCC precharge off */
-			Ana_Set_Reg(AUDENC_ANA_CON1, 0x0, 0x1 << 2);
 		}
 		if (GetAdcStatus() == false) {
+			/* Audio R preamplifier DCC precharge off */
+			Ana_Set_Reg(AUDENC_ANA_CON1, 0x0, 0x1 << 2);
+			/* Audio L preamplifier DCC precharge off */
+			Ana_Set_Reg(AUDENC_ANA_CON0, 0x0, 0x1 << 2);
+
 			/* here to set digital part */
 			/* power on clock */
 			Ana_Set_Reg(PMIC_AUDIO_TOP_CON0, 0x8000, 0xdfbf);
@@ -5920,10 +5915,15 @@ static void mt6357_codec_init_reg(struct snd_soc_component *component)
 	Ana_Set_Reg(AUDDEC_ANA_CON3, 0x1 << 4, 0x1 << 4);
 	/* disable LO buffer left short circuit protection */
 	Ana_Set_Reg(AUDDEC_ANA_CON4, 0x1 << 4, 0x1 << 4);
+	/* AUDENC_ANA_CON10 bit12 EINTHIRENB 0:2M 1:500k */
+	Ana_Set_Reg(AUDENC_ANA_CON10, 0x1c07, 0xffff);
 	/* set gpio */
 	set_playback_gpio(false);
 	set_capture_gpio(false);
 	audckbufEnable(false);
+#ifdef CONFIG_SND_SOC_MT6357_ACCDET
+	mtk_accdet_init(component);
+#endif
 }
 void InitCodecDefault(void)
 {

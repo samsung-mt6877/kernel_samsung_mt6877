@@ -136,5 +136,10 @@ extern void mt_accdet_remove(void);
 extern void mt_accdet_suspend(void);
 extern void mt_accdet_resume(void);
 extern void accdet_set_debounce(int state, unsigned int debounce);
+#ifdef CONFIG_SND_SOC_SAMSUNG_AUDIO
+u32 accdet_get_adc(void);
+#endif
 
+extern int mtk_accdet_init(struct snd_soc_component *component);
+extern int mtk_accdet_set_drvdata(struct snd_soc_card *card);
 #endif
