@@ -164,7 +164,6 @@ struct mmc_host_ops {
 					 int card_drv, int *drv_type);
 	void	(*hw_reset)(struct mmc_host *host);
 	void	(*card_event)(struct mmc_host *host);
-	void	(*remove_bad_sdcard)(struct mmc_host *host);
 
 	/*
 	 * Optional callback to support controllers with HW issues for multiple
@@ -599,7 +598,8 @@ struct mmc_host {
 	union swcqhci_crypto_cfg_entry *crypto_cfgs;
 	struct keyslot_manager *ksm;
 #endif /* CONFIG_MMC_CRYPTO */
-
+    unsigned int        card_detect_cnt;
+	int (*sdcard_uevent)(struct mmc_card *card);
 	unsigned long		private[0] ____cacheline_aligned;
 };
 
