@@ -29,8 +29,8 @@
 
 	/* chosen */
 	chosen: chosen {
-		bootargs = "console=tty0 console=ttyS0,921600n1 root=/dev/ram \
-vmalloc=400M slub_debug=OFZPU swiotlb=noforce \
+		bootargs = "root=/dev/ram \
+vmalloc=400M swiotlb=noforce \
 cgroup.memory=nosocket,nokmem \
 firmware_class.path=/vendor/firmware \
 page_owner=on loop.max_part=7";
@@ -425,6 +425,12 @@ page_owner=on loop.max_part=7";
 		interrupts = <GIC_SPI 297 IRQ_TYPE_EDGE_RISING>;
 	};
 
+	teegris {
+		compatible = "samsung,teegris";
+		interrupts = <GIC_SPI 262 IRQ_TYPE_LEVEL_LOW>,
+				 <GIC_SPI 263 IRQ_TYPE_LEVEL_LOW>;
+	};
+
 	tee_sanity {
 		compatible = "mediatek,tee_sanity";
 		interrupts = <GIC_SPI 298 IRQ_TYPE_EDGE_RISING>;
@@ -466,6 +472,11 @@ page_owner=on loop.max_part=7";
 			alloc-range = <0 0xc0000000 0 0x10000000>;
 		};
 
+		cccimdee-reserved-memory@0x4AE3E000 {
+			compatible = "mediatek,ccci-md-ee-dump";
+			reg = <0 0x4AE3E000 0 0x1c2000>;/* 1800KB */
+		};
+
 		reserve-memory-sspm_share {
 			compatible = "mediatek,reserve-memory-sspm_share";
 			no-map;
@@ -498,7 +509,7 @@ page_owner=on loop.max_part=7";
 		consys_mem: consys-reserve-memory {
 			compatible = "mediatek,consys-reserve-memory";
 			no-map;
-			size = <0 0x400000>;
+			size = <0 0x440000>;
 			alignment = <0 0x1000000>;
 			alloc-ranges = <0 0x40000000 0 0x80000000>;
 		};
@@ -511,6 +522,21 @@ page_owner=on loop.max_part=7";
 			alloc-ranges = <0 0x40000000 0 0x80000000>;
 		};
 
+#ifdef CONFIG_MICROTRUST_TEE_SUPPORT
+		soter-shared-mem {
+			compatible = "microtrust,shared_mem";
+			no-map;
+#if defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT) || \
+	defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
+			size = <0 0x800000>;
+			alignment = <0 0x1000000>;
+#else
+			size = <0 0x200000>;
+			alignment = <0 0x200000>;
+#endif
+			alloc-ranges = <0 0x40000000 0 0x50000000>;
+		};
+#endif
 	};
 
 	cpu_dbgapb: cpu_dbgapb@0e010000 {
@@ -567,7 +593,7 @@ page_owner=on loop.max_part=7";
 	};
 
 	infracfg_ao: infracfg_ao@10001000 {
-		compatible = "mediatek,common-infracfg_ao","mediatek,infracfg_ao","syscon";
+		compatible = "mediatek,infracfg_ao", "syscon";
 		reg = <0 0x10001000 0 0x1000>;
 		interrupts = <GIC_SPI 71 IRQ_TYPE_EDGE_RISING>;
 		#clock-cells = <1>;
@@ -587,10 +613,10 @@ page_owner=on loop.max_part=7";
 		#clock-cells = <1>;
 	};
 
-	mcdi:mcdi@00110100 {
+	mcdi:mcdi@0010fc00 {
 		compatible = "mediatek,mt6768-mcdi";
 		mediatek,enabled = <1>;
-		reg = <0 0x00110100 0 0x800>,
+		reg = <0 0x0010fc00 0 0x800>,
 		      <0 0x0c53a000 0 0x1000>;
 	};
 
@@ -873,7 +899,8 @@ page_owner=on loop.max_part=7";
 
 	mrdump_ext_rst: mrdump_ext_rst {
 		compatible = "mediatek, mrdump_ext_rst-eint";
-		mode = "IRQ";
+		force_mode = "SYSRST";
+		mode = "RST";
 		status = "okay";
 	};
 
@@ -885,7 +912,7 @@ page_owner=on loop.max_part=7";
 	dvfsrc: dvfsrc@10012000 {
 		compatible = "mediatek,dvfsrc";
 		reg = <0 0x10012000 0 0x1000>,
-			<0 0x00110b80 0 0x80>;
+			<0 0x00110780 0 0x80>;
 	};
 
 	mbist_ao@10013000 {
@@ -928,7 +955,6 @@ page_owner=on loop.max_part=7";
 			      "mediatek,mt6765-timer",
 			      "mediatek,sys_timer";
 		reg = <0 0x10017000 0 0x1000>;
-		reg-names = "sys_timer_base";
 		interrupts = <GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&clk13m>;
 	};
@@ -1335,10 +1361,10 @@ page_owner=on loop.max_part=7";
 		reg = <0 0x10227000 0 0x1000>;
 	};
 
-	dvfsp: dvfsp@00110c00 {
+	dvfsp: dvfsp@00110800 {
 		compatible = "mediatek,mt6768-dvfsp";
-		reg = <0 0x00110c00 0 0x1400>,
-		      <0 0x00110c00 0 0x1400>;
+		reg = <0 0x00110800 0 0x1400>,
+		      <0 0x00110800 0 0x1400>;
 		state = <1>;
 		change_flag = <0>;
 		little-rise-time = <1000>;
@@ -1421,6 +1447,7 @@ page_owner=on loop.max_part=7";
 		disp_mutex_reg = <0x14016000 0x1000>;
 		g3d_config_base = <0x13000000 0 0xffff0000>;
 		mmsys_config_base = <0x14000000 1 0xffff0000>;
+		mipitx0_base = <0x11c80000 99 0xffff0000>;
 		disp_dither_base = <0x14010000 2 0xffff0000>;
 		mm_na_base = <0x14020000 3 0xffff0000>;
 		imgsys_base = <0x15020000 4 0xffff0000>;
@@ -2219,8 +2246,6 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 		pu_cfg = <0x60>;
 		rsel_cfg = <0x90>;
 		aed = <0x1a>;
-		ch_offset_default = <0x100>;
-		ch_offset_ccu = <0x200>;
 	};
 
 	i2c4: i2c4@11011000 {
@@ -2589,6 +2614,88 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 			clock-names = "ref";
 			#phy-cells = <1>;
 			status = "okay";
+		};
+	};
+
+	usb_tuning:usb_tuning {
+		compatible = "mediatek,phy_tuning";
+
+		tune@1 {
+			label = "bgr_en";
+			offset = <0x0>;
+			shift = <0>;
+			mask = <0x1>;
+			value = <0x0>;
+		};
+		tune@2 {
+			label = "intr_en";
+			offset = <0x0>;
+			shift = <5>;
+			mask = <0x1>;
+			value = <0x1>;
+		};
+		tune@3 {
+			label = "mpx_out_sel";
+			offset = <0x0>;
+			shift = <28>;
+			mask = <0x3>;
+			value = <0x0>;
+		};
+		tune@4 {
+			label = "term_vref_sel";
+			offset = <0x4>;
+			shift = <8>;
+			mask = <0x7>;
+			value = <0x6>;
+		};
+		tune@5 {
+			label = "vrt_ref";
+			offset = <0x4>;
+			shift = <12>;
+			mask = <0x7>;
+			value = <0x7>;
+		};
+		tune@6 {
+			label = "intr_cal";
+			offset = <0x4>;
+			shift = <19>;
+			mask = <0x1f>;
+			value = <0x19>;
+		};
+		tune@7 {
+			label = "hstx_srctrl";
+			offset = <0x14>;
+			shift = <12>;
+			mask = <0x7>;
+			value = <0x1>;
+		};
+		tune@8 {
+			label = "hstx_srcal_en";
+			offset = <0x14>;
+			shift = <15>;
+			mask = <0x1>;
+			value = <0x0>;
+		};
+		tune@9 {
+			label = "sqth";
+			offset = <0x18>;
+			shift = <0>;
+			mask = <0xf>;
+			value = <0x1>;
+		};
+		tune@10 {
+			label = "discth";
+			offset = <0x18>;
+			shift = <4>;
+			mask = <0xf>;
+			value = <0xa>;
+		};
+		tune@11 {
+			label = "enhance";
+			offset = <0x18>;
+			shift = <30>;
+			mask = <0x3>;
+			value = <0x3>;
 		};
 	};
 
@@ -3650,6 +3757,7 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 			"CLK_SCP_SYS_CAM";
 	};
 
+
 	camera_af_hw_node: camera_af_hw_node {
 		compatible = "mediatek,camera_af_lens";
 	};
@@ -3658,17 +3766,22 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 		compatible = "mediatek,flashlight_core";
 	};
 
-	flashlights_mt6370: flashlights_mt6370 {
-		compatible = "mediatek,flashlights_mt6370";
+	flashlights_sm5714: flashlights_sm5714 {
+		compatible = "mediatek,flashlights_sm5714";
 		decouple = <0>;
 		channel@1 {
 			type = <0>;
 			ct = <0>;
 			part = <0>;
 		};
-		channel@2 {
+	};
+
+	flashlights_s2mu106: flashlights_s2mu106 {
+		compatible = "mediatek,flashlights_s2mu106";
+		decouple = <0>;
+		channel@1 {
 			type = <0>;
-			ct = <1>;
+			ct = <0>;
 			part = <0>;
 		};
 	};
@@ -3729,12 +3842,12 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 
 	memory_ssmr_features: memory-ssmr-features {
 		compatible = "mediatek,memory-ssmr-features";
-		svp-region-based-size = <0 0x10000000>;
+		svp-region-based-size = <0 0x12000000>;
 		iris-recognition-size = <0 0x10000000>;
 		2d_fr-size = <0 0>;
 		tui-size = <0 0x4000000>;
-		wfd-size = <0 0x5000000>;
-		prot-region-based-size = <0 0x8000000>;
+		wfd-size = <0 0x6000000>;
+		prot-region-based-size = <0 0xC000000>;
 		ta-elf-size = <0 0x1000000>;
 		ta-stack-heap-size = <0 0x6000000>;
 		sdsp-tee-sharedmem-size = <0 0x1000000>;
@@ -3946,19 +4059,6 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 		compatible = "goodix,touch";
 	};
 
-	nfc:nfc {
-		compatible = "mediatek,nfc-gpio-v2";
-		gpio-rst = <159>;
-		gpio-rst-std = <&pio 159 0x0>;
-		gpio-irq = <9>;
-		gpio-irq-std = <&pio 9 0x0>;
-	};
-
-	irq_nfc: irq_nfc {
-		compatible = "mediatek,irq_nfc-eint";
-	};
-	/* NFC end */
-
 	smart_pa: smart_pa {
 	};
 
@@ -3985,8 +4085,12 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 &pio {
 	aud_clk_mosi_off: aud_clk_mosi_off {
 		pins_cmd0_dat {
-			pinmux = <PINMUX_GPIO136__FUNC_GPIO136>,
-				 <PINMUX_GPIO137__FUNC_GPIO137>;
+			pinmux = <PINMUX_GPIO136__FUNC_GPIO136>;
+			bias-pull-down;
+		};
+		pins_cmd1_dat {
+			pinmux = <PINMUX_GPIO137__FUNC_GPIO137>;
+			bias-pull-down;
 		};
 	};
 
@@ -3994,17 +4098,23 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 		pins_cmd0_dat {
 			pinmux = <PINMUX_GPIO136__FUNC_AUD_CLK_MOSI>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 		pins_cmd1_dat {
 			pinmux = <PINMUX_GPIO137__FUNC_AUD_SYNC_MOSI>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 	};
 
 	aud_clk_miso_off: aud_clk_miso_off {
 		pins_cmd0_dat {
-			pinmux = <PINMUX_GPIO140__FUNC_GPIO140>,
-				 <PINMUX_GPIO141__FUNC_GPIO141>;
+			pinmux = <PINMUX_GPIO140__FUNC_GPIO140>;
+			bias-pull-down;
+		};
+		pins_cmd1_dat {
+			pinmux = <PINMUX_GPIO141__FUNC_GPIO141>;
+			bias-pull-down;
 		};
 	};
 
@@ -4012,31 +4122,32 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 		pins_cmd0_dat {
 			pinmux = <PINMUX_GPIO140__FUNC_AUD_CLK_MISO>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 		pins_cmd1_dat {
 			pinmux = <PINMUX_GPIO141__FUNC_AUD_SYNC_MISO>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 	};
 
 	aud_dat_mosi_off: aud_dat_mosi_off {
 		pins_cmd0_dat {
 			pinmux = <PINMUX_GPIO136__FUNC_GPIO136>;
-			input-enable;
 			slew-rate = <0>;
-			bias-disable;
+			bias-pull-down;
 		};
 		pins_cmd1_dat {
 			pinmux = <PINMUX_GPIO137__FUNC_GPIO137>;
 			input-enable;
 			slew-rate = <0>;
-			bias-disable;
+			bias-pull-down;
 		};
 		pins_cmd2_dat {
 			pinmux = <PINMUX_GPIO138__FUNC_GPIO138>;
 			input-enable;
 			slew-rate = <0>;
-			bias-disable;
+			bias-pull-down;
 		};
 		pins_cmd3_dat {
 			pinmux = <PINMUX_GPIO139__FUNC_GPIO139>;
@@ -4050,18 +4161,22 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 		pins_cmd0_dat {
 			pinmux = <PINMUX_GPIO136__FUNC_AUD_CLK_MOSI>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 		pins_cmd1_dat {
 			pinmux = <PINMUX_GPIO137__FUNC_AUD_SYNC_MOSI>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 		pins_cmd2_dat {
 			pinmux = <PINMUX_GPIO138__FUNC_AUD_DAT_MOSI0>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 		pins_cmd3_dat {
 			pinmux = <PINMUX_GPIO139__FUNC_AUD_DAT_MOSI1>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 	};
 
@@ -4070,25 +4185,25 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 			pinmux = <PINMUX_GPIO140__FUNC_GPIO140>;
 			input-enable;
 			slew-rate = <0>;
-			bias-disable;
+			bias-pull-down;
 		};
 		pins_cmd1_dat {
 			pinmux = <PINMUX_GPIO141__FUNC_GPIO141>;
 			input-enable;
 			slew-rate = <0>;
-			bias-disable;
+			bias-pull-down;
 		};
 		pins_cmd2_dat {
 			pinmux = <PINMUX_GPIO142__FUNC_GPIO142>;
 			input-enable;
 			slew-rate = <0>;
-			bias-disable;
+			bias-pull-down;
 		};
 		pins_cmd3_dat {
 			pinmux = <PINMUX_GPIO143__FUNC_GPIO143>;
 			input-enable;
 			slew-rate = <0>;
-			bias-disable;
+			bias-pull-down;
 		};
 	};
 
@@ -4096,18 +4211,22 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 		pins_cmd0_dat {
 			pinmux = <PINMUX_GPIO140__FUNC_AUD_CLK_MISO>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 		pins_cmd1_dat {
 			pinmux = <PINMUX_GPIO141__FUNC_AUD_SYNC_MISO>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 		pins_cmd2_dat {
 			pinmux = <PINMUX_GPIO142__FUNC_AUD_DAT_MISO0>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 		pins_cmd3_dat {
 			pinmux = <PINMUX_GPIO143__FUNC_AUD_DAT_MISO1>;
 			input-schmitt-enable;
+			bias-disable;
 		};
 	};
 
@@ -4176,7 +4295,9 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 	};
 };
 
-
+#if defined(CONFIG_SEC_DEBUG)
+#include "sec_debug_mt6768.dtsi"
+#endif
 #include "mediatek/mt6358.dtsi"
 #include "mediatek/cust_mt6768_msdc.dtsi"
 #include "mediatek/mt6370.dtsi"
@@ -4191,3 +4312,4 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 #ifdef CONFIG_MTK_ENABLE_GENIEZONE
 #include "mediatek/trusty.dtsi"
 #endif
+#include "modem-MTK-pdata.dtsi"

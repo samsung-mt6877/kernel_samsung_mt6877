@@ -171,7 +171,7 @@
 			regulator-max-microvolt = <2100000>;
 			regulator-always-on;
 		};
-		ldo7 {
+		mt_pmic_vdram2_ldo_reg: ldo7 {
 			regulator-compatible = "LDO7";
 			regulator-name = "VDRAM2";
 			regulator-min-microvolt = <500000>;
@@ -205,13 +205,13 @@
 			regulator-compatible = "LDO3";
 			regulator-name = "VMC";
 			regulator-min-microvolt = <1200000>;
-			regulator-max-microvolt = <3600000>;
+			regulator-max-microvolt = <2950000>;
 		};
 		mt_pmic_vmch_ldo_reg: ldo5 {
 			regulator-compatible = "LDO5";
 			regulator-name = "VMCH";
 			regulator-min-microvolt = <2700000>;
-			regulator-max-microvolt = <3600000>;
+			regulator-max-microvolt = <2950000>;
 		};
 	};
 };
