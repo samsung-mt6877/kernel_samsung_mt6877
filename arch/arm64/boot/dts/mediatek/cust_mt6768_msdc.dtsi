@@ -137,8 +137,8 @@
 	sd-uhs-sdr50;
 	sd-uhs-sdr104;
 	sd-uhs-ddr50;
-	cd-gpios = <&pio 18 GPIO_ACTIVE_LOW>;
-	vmmc-supply = <&mt6358_vmch_eint_high>;
+	cd-gpios = <&pio 9 GPIO_ACTIVE_LOW>;
+	vmmc-supply = <&mt_pmic_vmch_ldo_reg>;
 	vqmmc-supply = <&mt_pmic_vmc_ldo_reg>;
 	no-mmc;
 	no-sdio;
@@ -164,7 +164,7 @@
 		};
 
 		pins_insert {
-			pinmux = <PINMUX_GPIO18__FUNC_GPIO18>;
+			pinmux = <PINMUX_GPIO9__FUNC_GPIO9>;
 			bias-pull-up;
 		};
 	};

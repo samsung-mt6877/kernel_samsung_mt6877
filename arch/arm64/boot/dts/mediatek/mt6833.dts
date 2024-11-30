@@ -30,7 +30,7 @@
 	/* chosen */
 	chosen: chosen {
 		bootargs = "console=tty0 console=ttyS0,921600n1 root=/dev/ram \
-		vmalloc=400M slub_debug=OFZPU swiotlb=noforce \
+		vmalloc=400M swiotlb=noforce \
 		firmware_class.path=/vendor/firmware \
 		androidboot.hardware=mt6833 \
 		page_owner=on loop.max_part=7";
@@ -424,8 +424,12 @@
 
 		irq-remain = <&edge_keypad &edge_mdwdt>,
 			     <&level_mali0 &level_mali1>,
-			     <&level_mali2 &level_mali3 &level_mali4>,
+			     <&level_mali2 &level_mali3 &level_mali4>,		     
+#if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_MTK_LPM_TSP_IRQ_REMAIN)
+			     <&level_i2c0 &level_i2c8>,
+#else
 			     <&level_i2c0>,
+#endif
 			     <&level_cam1 &level_cam2>;
 
 		resource-ctrl = <&bus26m &infra &syspll>,
@@ -472,10 +476,21 @@
 				target = <&mali>;
 				value = <0 4 0 0>;
 			};
+#if defined(CONFIG_SEC_FACTORY) && defined(CONFIG_MTK_LPM_TSP_IRQ_REMAIN)
+			level_i2c0: level_i2c0 {
+				target = <&i2c0>;
+				value = <0 0 0 0>;
+			};
+			level_i2c8: level_i2c8 {
+				target = <&i2c8>;
+				value = <0 0 0 0>;
+ 			};
+#else
 			level_i2c0: level_i2c0 {
 				target = <&i2c0>;
 				value = <0 4 0 0>;
 			};
+#endif
 			level_cam1: level_cam1 {
 				target = <&cam1>;
 				value = <0 0 0 0>;
@@ -556,6 +571,11 @@
 			alloc-range = <0 0xc0000000 0 0x10000000>;
 		};
 
+		cccimdee-reserved-memory@0x4AE3E000 {
+			compatible = "mediatek,ccci-md-ee-dump";
+			reg = <0 0x4AE3E000 0 0x1c2000>;/* 1800KB */
+		};
+
 		reserve-memory-scp_share {
 			compatible = "mediatek,reserve-memory-scp_share";
 			no-map;
@@ -609,7 +629,7 @@
 		consys_mem: consys-reserve-memory {
 			compatible = "mediatek,consys-reserve-memory";
 			no-map;
-			size = <0 0x500000>;
+			size = <0 0x540000>;
 			alignment = <0 0x1000000>;
 			alloc-ranges = <0 0x40000000 0 0x80000000>;
 		};
@@ -1070,8 +1090,10 @@
 		compatible = "mediatek,gauge_timer_service";
 	};
 
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 #if (CONFIG_MTK_GAUGE_VERSION == 30)
 	#include "mediatek/bat_setting/mt6833_battery_prop.dtsi"
+#endif
 #endif
 
 	subpmic_pmu_eint:subpmic_pmu_eint {
@@ -1108,7 +1130,7 @@
 			<0 0>;
 
 		vcc-supply = <&mt_pmic_vemc_ldo_reg>;
-		vccq2-supply = <&mt_pmic_vufs_ldo_reg>;
+		vcc-fixed-regulator;
 
 		resets = <&infracfg_rst 0>, <&infracfg_rst 1>,
 				 <&infracfg_rst 2>;
@@ -1439,6 +1461,7 @@
 				msdcpll {
 					fh-id = <11>;
 					pll-id = <11>;
+					ssc-rate = <2>;
 				};
 				adsppll {
 					fh-id = <12>;
@@ -3056,14 +3079,30 @@
 			clocks = <&clk26m>;
 			clock-names = "ref";
 			#phy-cells = <1>;
-			mediatek,eye-vrt = <5>; /* 0~7 */
-			mediatek,eye-term = <5>; /* 0~7 */
-			mediatek,eye-rev6 = <1>; /* 0~3 */
-			mediatek,eye-disc = <0>; /* 0~8 */
-			mediatek,host-eye-vrt = <5>; /* 0~7 */
-			mediatek,host-eye-term = <5>; /* 0~7 */
-			mediatek,host-eye-rev6 = <1>; /* 0~3 */
-			mediatek,host-eye-disc = <0>; /* 0~8 */
+			mediatek,eye-vrt = <0x6>; /* 0~7 */
+			mediatek,eye-term = <0x3>; /* 0~7 */
+			mediatek,eye-rev6 = <0x3>; /* 0~3 */
+			mediatek,eye-disc = <0xe>; /* 0~8 */
+			mediatek,eye-sqth = <0x2>; /* 0~f */
+			mediatek,eye-intr_cal = <0x19>; /* 0~1f */
+			mediatek,eye-rev4 = <1>; /* 1: on, 0: off */
+			mediatek,eye-src= <0x1>; /* 0~7 */
+			mediatek,eye-bgr_en = <0>; /* 1: on, 0: off */
+			mediatek,eye-intr_en = <1>; /* 1: on, 0: off */
+			mediatek,eye-mpx_out_sel = <0>; /* 0~3 */
+			mediatek,eye-hstx_srcal_en = <0>; /* 1: on, 0: off */
+			mediatek,host-eye-vrt = <6>; /* 0~7 */
+			mediatek,host-eye-term = <3>; /* 0~7 */
+			mediatek,host-eye-rev6 = <3>; /* 0~3 */
+			mediatek,host-eye-disc = <0xe>; /* 0~8 */
+			mediatek,host-eye-sqth = <0x2>; /* 0~f */
+			mediatek,host-eye-intr_cal = <0x19>; /* 0~1f */
+			mediatek,host-eye-rev4 = <1>; /* 1: on, 0: off */
+			mediatek,host-eye-src = <0x1>; /* 0~7 */
+			mediatek,host-eye-bgr_en = <0>; /* 1: on, 0: off */
+			mediatek,host-eye-intr_en = <1>; /* 1: on, 0: off */
+			mediatek,host-eye-mpx_out_sel = <0>; /* 0~3 */
+			mediatek,host-eye-hstx_srcal_en = <0>; /* 1: on, 0: off */
 			status = "okay";
 		};
 	};
@@ -3111,6 +3150,10 @@
 	flashlights_mt6360: flashlights_mt6360 {
 		compatible = "mediatek,flashlights_mt6360";
 		decouple = <1>;
+		flash_current = <25>;
+		torch_current = <6>;
+		factory_current = <15>;
+		flashlight_current = <1 2 4 6 8>;
 		channel@1 {
 			type = <0>;
 			ct = <0>;
@@ -3700,7 +3743,7 @@
 		larb0 = <8 7 8 8>;
 		larb1 = <7 8 8 9 8>;
 		larb2 = <7 7 7 7 8>;
-		larb4 = <3 7 4 7 7 7 7 7 7 6 7 4>;
+		larb4 = <3 7 4 7 7 7 7 7 7 6 4 7>;
 		larb7 = <7 8 8 8 7 7 7 7 7 7 7 7 8>;
 		larb9 = <7 7 7 7 7 7 8 8 8 8 7 7 8 9 8 6 6 7
 			7 7 7 7 7 7 8 8 8 8 7>;
@@ -4074,7 +4117,7 @@
 			<0>, /*MTK_DRM_OPT_SODI_SUPPORT*/
 			<1>, /*MTK_DRM_OPT_IDLE_MGR*/
 			<0>, /*MTK_DRM_OPT_IDLEMGR_SWTCH_DECOUPLE*/
-			<1>, /*MTK_DRM_OPT_IDLEMGR_BY_REPAINT*/
+			<0>, /*MTK_DRM_OPT_IDLEMGR_BY_REPAINT*/
 			<0>, /*MTK_DRM_OPT_IDLEMGR_ENTER_ULPS*/
 			<0>, /*MTK_DRM_OPT_IDLEMGR_KEEP_LP11*/
 			<0>, /*MTK_DRM_OPT_DYNAMIC_RDMA_GOLDEN_SETTING*/
@@ -5588,6 +5631,7 @@
 
 	gps: gps@18c00000 {
 		compatible = "mediatek,gps";
+		b13b14-status-addr = <0x10003328>;
 	};
 
 	odm: odm {
@@ -5606,14 +5650,16 @@
 		2d_fr-size = <0 0>;
 #endif
 #if defined(CONFIG_TRUSTONIC_TRUSTED_UI) || \
-	defined(CONFIG_BLOWFISH_TUI_SUPPORT)
+	defined(CONFIG_BLOWFISH_TUI_SUPPORT) || \
+	defined(CONFIG_TEEGRIS_TUI) || \
+	defined(CONFIG_SAMSUNG_TUI)
 		tui-size = <0 0x4000000>;
 #endif
 #ifdef CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT
 		wfd-size = <0 0x4000000>;
 #endif
 #ifdef CONFIG_MTK_PROT_MEM_SUPPORT
-		prot-region-based-size = <0 0x8000000>;
+		prot-region-based-size = <0 0x8800000>;
 		iris-recognition-size = <0 0x10000000>;
 #endif
 #ifdef CONFIG_MTK_HAPP_MEM_SUPPORT
@@ -5983,6 +6029,12 @@
 		interrupts = <GIC_SPI 83 IRQ_TYPE_EDGE_RISING>;
 	};
 
+	teegris {
+		compatible = "samsung,teegris";
+		interrupts = <GIC_SPI 302 IRQ_TYPE_LEVEL_HIGH>,
+					<GIC_SPI 303 IRQ_TYPE_LEVEL_HIGH>;
+	};
+
 	tee_sanity {
 		compatible = "mediatek,tee_sanity";
 		interrupts = <GIC_SPI 84 IRQ_TYPE_EDGE_RISING>;
@@ -6041,17 +6093,35 @@
 		/* enable_pe_4; */
 		enable_type_c;
 		power_path_support;
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 		enable_dynamic_mivr;
+#endif
 		bootmode = <&chosen>;
 
 		/* common */
 		battery_cv = <4350000>;
 		max_charger_voltage = <6500000>;
+#if defined(CONFIG_BATTERY_SAMSUNG)
+#if defined(CONFIG_SEC_FACTORY)
+		min_charger_voltage = <4200000>;
+
+		/* dynamic mivr */
+		min_charger_voltage_1 = <4200000>;
+		min_charger_voltage_2 = <4200000>;
+#else
+		min_charger_voltage = <4400000>;
+
+		/* dynamic mivr */
+		min_charger_voltage_1 = <4400000>;
+		min_charger_voltage_2 = <4400000>;
+#endif
+#else
 		min_charger_voltage = <4600000>;
 
 		/* dynamic mivr */
 		min_charger_voltage_1 = <4400000>;
 		min_charger_voltage_2 = <4200000>;
+#endif
 		max_dmivr_charger_current = <1400000>;
 
 		/* charging current */
@@ -6168,9 +6238,19 @@
 		compatible = "mediatek,rt-pd-manager";
 	};
 
+	gpio_afc: gpio_afc {
+		compatible = "gpio_afc";
+		pinctrl-names = "default";
+		pinctrl-0 = <&afc_switch &afc_output>;
+		status = "okay";
+		gpio_afc_switch = <&pio 171 0x0>;
+		gpio_afc_data = <&pio 12 0x0>;
+	};
+
 	mrdump_ext_rst: mrdump_ext_rst {
 		compatible = "mediatek, mrdump_ext_rst-eint";
-		mode = "IRQ";
+		force_mode = "SYSRST";
+		mode = "RST";
 		status = "okay";
 	};
 
@@ -6206,7 +6286,7 @@
 		< 650000 750000	 2    0x204  400   3	 0       2>,
 		< 725000 750000	 3    0x302  624   1     0x3     1>;
 
-		scp-cores = <2>;
+		scp-cores = <1>;
 
 		/*pmic-sshub-support;*/
 		/*vow-lp-en-gear = <2>;*/
@@ -6232,11 +6312,6 @@
 #include "mediatek/mt6359p.dtsi"
 #include "mediatek/mt6833-clkitg.dtsi"
 #include "mediatek/v1/mt6360.dtsi"
-
-&mt_pmic_vemc_ldo_reg {
-	regulator-min-microvolt = <3000000>;
-	regulator-max-microvolt = <3000000>;
-};
 
 &spmi_bus {
 	grpid = <11>;
@@ -6458,14 +6533,36 @@
 	};
 	aud_gpio_i2s5_on: aud_gpio_i2s5_on {
 	};
+
+	afc_output: output {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO12__FUNC_GPIO12>;
+			slew-rate = <1>;
+			output-enable;
+			bias-disable;
+		};
+	};
+
+	afc_switch: output {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO171__FUNC_GPIO171>;
+			slew-rate = <1>;
+			output-enable;
+			bias-disable;
+		};
+	};
 };
 
+#if defined(CONFIG_SEC_DEBUG)
+#include "sec_debug_mt6833.dtsi"
+#endif
 #include "mediatek/mt6315_s3.dtsi"
 #include "mediatek/cust_mt6833_msdc.dtsi"
 #ifdef CONFIG_MTK_ENABLE_GENIEZONE
 #include "mediatek/trusty.dtsi"
 #endif
 #include "mediatek/v1/mt6360_pd.dtsi"
+#include "modem-MT6833ap-pdata.dtsi"
 #ifdef CONFIG_REGULATOR_MT6315
 #include "mediatek/mt6315_s3.dtsi"
 #endif

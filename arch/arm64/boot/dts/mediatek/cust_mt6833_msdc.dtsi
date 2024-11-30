@@ -139,7 +139,7 @@
 	sd-uhs-sdr50;
 	sd-uhs-sdr104;
 	sd-uhs-ddr50;
-	cd-gpios = <&pio 4 GPIO_ACTIVE_LOW>;
+	cd-gpios = <&pio 4 GPIO_ACTIVE_HIGH>;
 	vmmc-supply = <&mt_pmic_vmch_ldo_reg>;
 	vqmmc-supply = <&mt_pmic_vmc_ldo_reg>;
 	no-mmc;
@@ -187,6 +187,7 @@
 			drive-strength = <3>;
 		};
 	};
+
 	mmc1_pins_pull_down: mmc1@1{
 		pins_cmd_dat {
 			pinmux = <PINMUX_GPIO128__FUNC_MSDC1_DAT0>,
