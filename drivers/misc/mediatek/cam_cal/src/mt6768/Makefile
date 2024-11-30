@@ -4,15 +4,18 @@ MTK_CUSTOM_PATH := $(srctree)/drivers/misc/mediatek
 MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
 CAM_CAL_SRC_PATH := $(MTK_CUSTOM_PATH)/cam_cal/src
 CAM_CAL_PLATFORM_SRC_PATH := $(CAM_CAL_SRC_PATH)/$(MTK_PLATFORM)
-ARCH_MTK_PROJECT := $(subst ",,$(CONFIG_ARCH_MTK_PROJECT))
-COMMON_VERSION := v1
 
-ifeq ($(CONFIG_ARCH_MTK_PROJECT), "tb8786p2_64_k419_wifi")
-KBUILD_CFLAGS += -DSUPPORT_S5K4H7
+ifdef CONFIG_CAMERA_SAMSUNG_MODEL_NAME
+ARCH_MTK_PROJECT := $(subst ",,$(CONFIG_CAMERA_SAMSUNG_MODEL_NAME))
+else
+ARCH_MTK_PROJECT := $(subst ",,$(CONFIG_ARCH_MTK_PROJECT))
 endif
+
+COMMON_VERSION := v1
 
 subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/imgsensor/inc \
                     -I$(MTK_CUSTOM_PATH)/imgsensor/src/$(CONFIG_MTK_PLATFORM)/camera_hw \
+                    -I$(MTK_CUSTOM_PATH)/imgsensor/src/common/sysfs \
                     -I$(MTK_CUSTOM_PATH)/cam_cal/inc \
                     -I$(CAM_CAL_PLATFORM_SRC_PATH) \
                     -I$(CAM_CAL_SRC_PATH)/common/$(COMMON_VERSION)

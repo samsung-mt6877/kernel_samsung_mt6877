@@ -194,6 +194,9 @@ static void mt6358_irq_sp_handler(struct mt6397_chip *chip,
 			}
 			log_threaded_irq_wakeup_reason(virq, chip->irq);
 #endif
+#ifdef CONFIG_SEC_PM
+			log_threaded_irq_wakeup_reason(virq, chip->irq);
+#endif /* CONFIG_SEC_PM  */
 			if (virq)
 				handle_nested_irq(virq);
 		}

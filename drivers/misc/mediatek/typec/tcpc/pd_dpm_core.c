@@ -48,6 +48,26 @@ static const struct svdm_svid_ops svdm_svid_ops[] = {
 	},
 #endif	/* CONFIG_USB_PD_ALT_MODE */
 
+#if IS_ENABLED(CONFIG_PDIC_NOTIFIER)
+	{
+		.name = "Samsung",
+		.svid = SAMSUNG_VID,
+
+		.dfp_inform_id = sec_dfp_notify_discover_id,
+		.dfp_inform_svids = sec_dfp_notify_discover_svid,
+		.dfp_inform_modes = sec_dfp_notify_discover_modes,
+
+		.dfp_inform_enter_mode = sec_dfp_notify_enter_mode,
+
+		.dfp_notify_uvdm = sec_dfp_notify_uvdm,
+
+		.notify_pe_startup = sec_dfp_notify_pe_startup,
+		.notify_pe_ready = sec_dfp_notify_pe_ready,
+
+		.parse_svid_data = sec_dfp_parse_svid_data,
+	},
+#endif	/* CONFIG_PDIC_NOTIFIER */
+
 #ifdef CONFIG_USB_PD_RICHTEK_UVDM
 	{
 		.name = "Richtek",
@@ -88,15 +108,22 @@ static const struct svdm_svid_ops svdm_svid_ops[] = {
 int dpm_check_supported_modes(void)
 {
 	int i;
-	const int size = ARRAY_SIZE(svdm_svid_ops);
+	bool is_disorder = false;
+	bool found_error = false;
 
-	for (i = 0; i < size; i++) {
+	for (i = 0; i < ARRAY_SIZE(svdm_svid_ops); i++) {
+		if (i < (ARRAY_SIZE(svdm_svid_ops) - 1)) {
+			if (svdm_svid_ops[i + 1].svid <=
+				svdm_svid_ops[i].svid)
+				is_disorder = true;
+		}
 		pr_info("SVDM supported mode [%d]: name = %s, svid = 0x%x\n",
 			i, svdm_svid_ops[i].name,
 			svdm_svid_ops[i].svid);
 	}
-
-	return 0;
+	pr_info("%s : found \"disorder\"...\n", __func__);
+	found_error |= is_disorder;
+	return found_error ? -EFAULT : 0;
 }
 
 /*
@@ -365,6 +392,15 @@ static bool dpm_build_default_request_info(
 	req_info->vmax = 5000;
 	req_info->vmin = 5000;
 
+#if IS_ENABLED(CONFIG_BATTERY_SAMSUNG)
+	if (req_info->type == DPM_PDO_TYPE_BAT) {
+		req_info->max_uw = (sink.uw > source.uw) ? source.uw : sink.uw;
+		req_info->oper_uw = req_info->max_uw;
+	} else {
+		req_info->max_ma = (sink.ma > source.ma) ? source.ma : sink.ma;
+		req_info->oper_ma = req_info->max_ma;
+	}
+#else
 	if (req_info->type == DPM_PDO_TYPE_BAT) {
 		req_info->max_uw = sink.uw;
 		req_info->oper_uw = source.uw;
@@ -373,6 +409,7 @@ static bool dpm_build_default_request_info(
 		req_info->max_ma = sink.ma;
 		req_info->oper_ma = source.ma;
 	}
+#endif
 
 	return true;
 }
@@ -1189,7 +1226,7 @@ static inline void dpm_dfp_update_svid_data_exit_mode(
 
 void pd_dpm_dfp_inform_id(struct pd_port *pd_port, bool ack)
 {
-	uint32_t *payload = pd_get_msg_vdm_data_payload(pd_port);
+	uint32_t *payload = pd_get_msg_vdm_data_payload(pd_port), vid = 0;
 	struct tcpc_device __maybe_unused *tcpc = pd_port->tcpc;
 
 	VDM_STATE_DPM_INFORMED(pd_port);
@@ -1205,6 +1242,8 @@ void pd_dpm_dfp_inform_id(struct pd_port *pd_port, bool ack)
 				payload[0], payload[1], payload[2], payload[3]);
 
 		dpm_dfp_update_partner_id(pd_port, payload);
+		vid = PD_IDH_VID(payload[0]);
+
 	}
 
 	if (!pd_port->pe_data.vdm_discard_retry_flag) {
@@ -1214,7 +1253,8 @@ void pd_dpm_dfp_inform_id(struct pd_port *pd_port, bool ack)
 		 * or doesn't support modal operation,
 		 * then don't send discoverSVID
 		 */
-		if (!ack || !(payload[0] & PD_IDH_MODAL_SUPPORT))
+		if (!ack || (!(payload[0] & PD_IDH_MODAL_SUPPORT)
+						&& vid != SAMSUNG_VID))
 			dpm_reaction_clear(pd_port, DPM_REACTION_DISCOVER_SVID);
 		else
 			dpm_reaction_set(pd_port, DPM_REACTION_DISCOVER_SVID);
@@ -2316,7 +2356,7 @@ int pd_dpm_core_init(struct pd_port *pd_port)
 
 #ifdef CONFIG_USB_PD_REV30
 	pd_port->pps_request_wake_lock =
-		wakeup_source_register(NULL, "pd_pps_request_wake_lock");
+		wakeup_source_register(&tcpc->dev, "pd_pps_request_wake_lock");
 	init_waitqueue_head(&pd_port->pps_request_wait_que);
 	atomic_set(&pd_port->pps_request, false);
 	pd_port->pps_request_task = kthread_run(pps_request_thread_fn, tcpc,

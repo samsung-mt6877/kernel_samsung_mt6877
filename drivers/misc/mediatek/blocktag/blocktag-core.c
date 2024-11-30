@@ -510,28 +510,6 @@ out:
 	rcu_read_unlock();
 }
 
-int mtk_btag_pidlog_get_mode(struct page *p)
-{
-	unsigned long idx;
-	short mode;
-	struct page_pid_logger *ppl;
-	struct page_pid_logger *pagelogger;
-
-	idx = mtk_btag_pidlog_index(p);
-	if (idx >= mtk_btag_pidlog_max_entry())
-		return -1;
-	rcu_read_lock();
-	pagelogger = rcu_dereference(mtk_btag_pagelogger);
-	if (unlikely(!pagelogger)) {
-		rcu_read_unlock();
-		return -1;
-	}
-	ppl = mtk_btag_pidlog_entry(pagelogger, idx);
-	mode = ppl->mode;
-	rcu_read_unlock();
-	return mode;
-}
-
 void mtk_btag_pidlog_copy_pid(struct page *src, struct page *dst)
 {
 	struct page_pid_logger *ppl_src, *ppl_dst, *pagelogger;
@@ -1100,7 +1078,7 @@ static ssize_t mtk_btag_main_write(struct file *file, const char __user *ubuf,
 {
 	struct mtk_blocktag *btag, *n;
 	int ret;
-	char cmd[MICTX_PROC_CMD_BUF_SIZE] = { 0 };
+	char cmd[MICTX_PROC_CMD_BUF_SIZE];
 
 	if (count == 0)
 		goto err;
@@ -1235,7 +1213,7 @@ static ssize_t mtk_btag_mictx_sub_write(struct file *file,
 	size_t count, loff_t *ppos)
 {
 	int ret;
-	char cmd[MICTX_PROC_CMD_BUF_SIZE] = { 0 };
+	char cmd[MICTX_PROC_CMD_BUF_SIZE];
 
 	if (count == 0)
 		goto err;
@@ -1660,11 +1638,11 @@ int mtk_btag_mictx_get_data(
 		ctx->req.w.size_top >>= 12;
 
 		if (ctx->top_r_pages) {
-			if (ctx->top_r_pages > ctx->req.r.size_top) {
-				ctx->top_r_pages -= ctx->req.r.size_top;
+			ctx->top_r_pages -= ctx->req.r.size_top;
+
+			if (ctx->top_r_pages > 0) {
 				comp = ctx->req.r.size - ctx->req.r.size_top;
-				comp = min_t(unsigned long, comp
-						, ctx->top_r_pages);
+				comp = min_t(int, comp, ctx->top_r_pages);
 				ctx->top_r_pages -= comp;
 				ctx->req.r.size_top += comp;
 			} else
@@ -1672,11 +1650,11 @@ int mtk_btag_mictx_get_data(
 		}
 
 		if (ctx->top_w_pages) {
-			if (ctx->top_w_pages > ctx->req.w.size_top) {
-				ctx->top_w_pages -= ctx->req.w.size_top;
+			ctx->top_w_pages -= ctx->req.w.size_top;
+
+			if (ctx->top_w_pages > 0) {
 				comp = ctx->req.w.size - ctx->req.w.size_top;
-				comp = min_t(unsigned long, comp
-						, ctx->top_w_pages);
+				comp = min_t(int, comp, ctx->top_w_pages);
 				ctx->top_w_pages -= comp;
 				ctx->req.w.size_top += comp;
 			} else

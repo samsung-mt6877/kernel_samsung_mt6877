@@ -39,10 +39,10 @@
 #endif
 #include "mach/pseudo_m4u.h"
 #ifdef CONFIG_MACH_MT6893
-#include <clk-mt6885-pg.h>
+#include <clk-mt6893-pg.h>
 #endif
 #ifdef CONFIG_MACH_MT6885
-#include <clk-mt6885-pg.h>
+#include <clk-mt6893-pg.h>
 #endif
 
 
@@ -3765,12 +3765,6 @@ static int ISP_WaitIrq(struct ISP_WAIT_IRQ_STRUCT *WaitIrq)
 	bool freeze_passbysigcnt = false;
 	unsigned long long sec = 0;
 	unsigned long usec = 0;
-
-	if ((idx > 31) || (idx < 0)) {
-		LOG_NOTICE("Error: Invalid idx(%d),Status(0x%x)\n",
-			idx, WaitIrq->EventInfo.Status);
-		return -EFAULT;
-	}
 
 	/* do_gettimeofday(&time_getrequest); */
 	sec = cpu_clock(0);	  /* ns */

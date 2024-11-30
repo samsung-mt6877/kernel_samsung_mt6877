@@ -59,8 +59,6 @@
 
 #include "mtk_charger.h"
 
-static bool is_module_init_done;
-
 struct tag_bootmode {
 	u32 size;
 	u32 tag;
@@ -1435,7 +1433,6 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	chr_err("%s\n", __func__);
 	info->chr_type = POWER_SUPPLY_TYPE_UNKNOWN;
 	info->charger_thread_polling = false;
-	info->pd_reset = false;
 
 	pdata1->disable_charging_count = 0;
 	pdata1->input_current_limit_by_aicl = -1;
@@ -1559,6 +1556,7 @@ static int charger_routine_thread(void *arg)
 {
 	struct mtk_charger *info = arg;
 	unsigned long flags;
+	static bool is_module_init_done;
 	bool is_charger_on;
 
 	while (1) {
@@ -1957,8 +1955,7 @@ static void mtk_charger_external_power_changed(struct power_supply *psy)
 		psy->desc->name, prop.intval, prop2.intval,
 		get_vbus(info));
 
-	if(is_module_init_done)
-		mtk_is_charger_on(info);
+	mtk_is_charger_on(info);
 	_wake_up_charger(info);
 }
 
@@ -2136,7 +2133,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 
 	info->pd_adapter = get_adapter_by_name("pd_adapter");
 	if (!info->pd_adapter)
-		chr_err("%s: No pd adapter found\n",__func__);
+		chr_err("%s: No pd adapter found\n");
 	else {
 		info->pd_nb.notifier_call = notify_adapter_event;
 		register_adapter_device_notifier(info->pd_adapter,

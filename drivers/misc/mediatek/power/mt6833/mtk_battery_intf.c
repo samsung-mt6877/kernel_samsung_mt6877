@@ -39,6 +39,11 @@ signed int battery_get_soc(void)
 	return 50;
 }
 
+signed int battery_get_precise_soc(void)
+{
+	return 500;
+}
+
 signed int battery_get_uisoc(void)
 {
 	struct mtk_battery *gm = get_mtk_battery();
@@ -55,6 +60,19 @@ signed int battery_get_uisoc(void)
 	}
 
 	return 50;
+}
+
+signed int battery_get_precise_uisoc(void)
+{
+	int boot_mode = get_boot_mode();
+
+	if ((boot_mode == META_BOOT) ||
+		(boot_mode == ADVMETA_BOOT) ||
+		(boot_mode == FACTORY_BOOT) ||
+		(boot_mode == ATE_FACTORY_BOOT))
+		return 750;
+
+	return 500;
 }
 
 signed int battery_get_bat_temperature(void)
@@ -113,22 +131,48 @@ signed int battery_get_soc(void)
 		return 50;
 }
 
+signed int battery_get_precise_soc(void)
+{
+	struct mtk_battery *gm = get_mtk_battery();
+
+	if (gm != NULL)
+		return gm->precise_soc;
+	else
+		return 500;
+}
+
 signed int battery_get_uisoc(void)
 {
 	struct mtk_battery *gm = get_mtk_battery();
-	if (gm != NULL) {
-		int boot_mode = gm->boot_mode;
+	int boot_mode = gm->boot_mode;
 
-		if ((boot_mode == META_BOOT) ||
-			(boot_mode == ADVMETA_BOOT) ||
-			(boot_mode == FACTORY_BOOT) ||
-			(boot_mode == ATE_FACTORY_BOOT))
-			return 75;
-		else if (boot_mode == 0)
-			return gm->ui_soc;
-	}
+	if ((boot_mode == META_BOOT) ||
+		(boot_mode == ADVMETA_BOOT) ||
+		(boot_mode == FACTORY_BOOT) ||
+		(boot_mode == ATE_FACTORY_BOOT))
+		return 75;
 
-	return 50;
+	if (gm != NULL)
+		return gm->ui_soc;
+	else
+		return 50;
+}
+
+signed int battery_get_precise_uisoc(void)
+{
+	int boot_mode = get_boot_mode();
+	struct mtk_battery *gm = get_mtk_battery();
+
+	if ((boot_mode == META_BOOT) ||
+		(boot_mode == ADVMETA_BOOT) ||
+		(boot_mode == FACTORY_BOOT) ||
+		(boot_mode == ATE_FACTORY_BOOT))
+		return 750;
+
+	if (gm != NULL)
+		return gm->precise_ui_soc;
+	else
+		return 500;
 }
 
 signed int battery_get_bat_temperature(void)

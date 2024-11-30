@@ -67,6 +67,9 @@
 
 #define CREATE_TRACE_POINTS
 #include "mtk_cooler_atm_events.h"
+#if IS_ENABLED(CONFIG_SEC_THERMAL_LOG)
+#include <linux/thermal.h>
+#endif
 
 /*****************************************************************************
  *  Local switches
@@ -841,7 +844,14 @@ static void set_adaptive_cpu_power_limit(unsigned int limit)
 				adaptive_limit[2][0], adaptive_limit[2][1],
 				adaptive_limit[1][0], adaptive_limit[1][1],
 				adaptive_limit[0][0], adaptive_limit[0][1]);
-
+#if IS_ENABLED(CONFIG_SEC_THERMAL_LOG)
+				ss_thermal_print("%d T=%d, %d T=%d, %d T=%d, %d T=%d, %d T=%d\n",
+					adaptive_limit[4][0], adaptive_limit[4][1],
+					adaptive_limit[3][0], adaptive_limit[3][1],
+					adaptive_limit[2][0], adaptive_limit[2][1],
+					adaptive_limit[1][0], adaptive_limit[1][1],
+					adaptive_limit[0][0], adaptive_limit[0][1]);
+#endif
 			print_cunt = 0;
 		} else {
 #ifdef FAST_RESPONSE_ATM

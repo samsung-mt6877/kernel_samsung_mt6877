@@ -5,7 +5,7 @@
 #ifndef __TZBATT_INITCFG_H__
 #define __TZBATT_INITCFG_H__
 
-#define TZBATT_SET_INIT_CFG				(1)
+#define TZBATT_SET_INIT_CFG				(0)
 
 #define TZBATT_INITCFG_INTERVAL				(1)
 #define TZBATT_INITCFG_NUM_TRIPS			(3)
@@ -41,4 +41,3 @@
 #define TZBATT_INITCFG_TRIP_9_COOLER			""
 
 #endif	/* __TZBATT_INITCFG_H__ */
-

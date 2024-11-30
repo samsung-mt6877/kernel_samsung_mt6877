@@ -26,4 +26,6 @@
 
 #define AW3644_DTNAME_I2C "mediatek,strobe_main"
 #define AW3644_DTNAME     "mediatek,flashlights_aw3644"
+
+#define SM5714_DTNAME     "mediatek,flashlights_sm5714"
 #endif /* _FLASHLIGHT_DT_H */

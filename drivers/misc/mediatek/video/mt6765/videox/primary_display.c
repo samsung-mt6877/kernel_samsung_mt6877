@@ -91,6 +91,7 @@
 #ifdef MTK_FB_MMDVFS_SUPPORT
 #include <linux/soc/mediatek/mtk-pm-qos.h>
 #endif
+#include "mtk_notify.h"
 
 #define MMSYS_CLK_LOW (0)
 #define MMSYS_CLK_HIGH (1)
@@ -179,6 +180,8 @@ wait_queue_head_t primary_display_present_fence_wq;
 atomic_t primary_display_pt_fence_update_event = ATOMIC_INIT(0);
 static unsigned int _need_lfr_check(void);
 struct Layer_draw_info *draw;
+struct mtk_uevent_dev uevent_data;
+EXPORT_SYMBOL(uevent_data);
 
 #ifdef CONFIG_MTK_DISPLAY_120HZ_SUPPORT
 static int od_need_start;
@@ -4182,6 +4185,9 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps,
 	ret = switch_dev_register(&disp_switch_data);
 #endif
 
+	uevent_data.name = "lcm_disconnect";
+	uevent_dev_register(&uevent_data);
+
 	DISPCHECK("primary_display_init done\n");
 
 done:
@@ -4650,6 +4656,10 @@ int primary_display_suspend(void)
 #endif
 #endif
 
+#if defined(CONFIG_MTK_VSYNC_PRINT)
+	disp_unregister_irq_callback(vsync_print_handler);
+	pr_info("%s: vsync_print\n", __func__);
+#endif
 	DISPCHECK("primary_display_suspend begin\n");
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_suspend,
 		MMPROFILE_FLAG_START, 0, 0);
@@ -4663,17 +4673,26 @@ int primary_display_suspend(void)
 	if (primary_display_is_video_mode())
 		primary_display_switch_dst_mode(0);
 #endif
+#if defined(CONFIG_SMCDSD_PANEL)
+	disp_lcm_path_lock(1, pgc->plcm);
+#endif
 	_primary_path_switch_dst_lock();
 	disp_sw_mutex_lock(&(pgc->capture_lock));
 	_primary_path_lock(__func__);
 
 	while (primary_get_state() == DISP_BLANK) {
 		_primary_path_unlock(__func__);
+#if defined(CONFIG_SMCDSD_PANEL)
+		disp_lcm_path_lock(0, pgc->plcm);
+#endif
 		DISPCHECK("primary_display_suspend wait tui finish!!\n");
 #if 0 //def CONFIG_TRUSTONIC_TRUSTED_UI
 		switch_set_state(&disp_switch_data, DISP_SLEPT);
 #endif
 		primary_display_wait_state(DISP_ALIVE, MAX_SCHEDULE_TIMEOUT);
+#if defined(CONFIG_SMCDSD_PANEL)
+		disp_lcm_path_lock(1, pgc->plcm);
+#endif
 		_primary_path_lock(__func__);
 		DISPCHECK("primary_display_suspend wait tui done stat=%d\n",
 			primary_get_state());
@@ -4739,12 +4758,26 @@ int primary_display_suspend(void)
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_suspend,
 		MMPROFILE_FLAG_PULSE, 0, 2);
 
+#if defined(CONFIG_SMCDSD_PANEL)
+	//if (primary_display_get_power_mode_nolock() == FB_SUSPEND)
+		//disp_lcm_disable(pgc->plcm);
+
+	/* From now, MIPI TX command will be written on register directly */
+	disp_lcm_cmdq(pgc->plcm, 0);
+#endif
 	if (disp_helper_get_option(DISP_OPT_USE_CMDQ)) {
 		DISPCHECK("[POWER]display cmdq trigger loop stop\n");
 		_cmdq_stop_trigger_loop();
 	}
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_suspend,
 		MMPROFILE_FLAG_PULSE, 0, 3);
+
+#if defined(CONFIG_SMCDSD_PANEL)
+	if (pgc->plcm->drv->disable &&
+		(primary_display_get_power_mode_nolock() == FB_SUSPEND)) {
+		disp_lcm_disable(pgc->plcm);
+	}
+#endif
 
 	DISPDBG("[POWER]primary display path stop[begin]\n");
 	dpmgr_path_stop(pgc->dpmgr_handle, CMDQ_DISABLE);
@@ -4808,6 +4841,10 @@ int primary_display_suspend(void)
 		MMPROFILE_FLAG_PULSE, 0, 8);
 
 	pgc->lcm_refresh_rate = 60;
+#if defined(CONFIG_SMCDSD_PANEL)
+	if (primary_display_get_power_mode_nolock() == FB_SUSPEND)
+		disp_lcm_power_enable(pgc->plcm, 0);
+#endif
 	/* pgc->state = DISP_SLEPT; */
 #ifdef CONFIG_MTK_HIGH_FRAME_RATE
 		/*DynFPS*/
@@ -4827,6 +4864,9 @@ done:
 	__pm_relax(pri_wk_lock);
 
 	_primary_path_unlock(__func__);
+#if defined(CONFIG_SMCDSD_PANEL)
+	disp_lcm_path_lock(0, pgc->plcm);
+#endif
 	disp_sw_mutex_unlock(&(pgc->capture_lock));
 	_primary_path_switch_dst_unlock();
 
@@ -4911,6 +4951,13 @@ int primary_display_resume(void)
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 		MMPROFILE_FLAG_START, 0, 0);
 
+#if defined(CONFIG_SMCDSD_PANEL)
+/*
+ *	@ disp_lcm_path_lock
+ *	LCM lock -> primary display lock.
+ */
+	disp_lcm_path_lock(1, pgc->plcm);
+#endif
 	_primary_path_lock(__func__);
 	if (pgc->state == DISP_ALIVE) {
 		DISPCHECK("primary display path is already resume, skip\n");
@@ -4943,6 +4990,11 @@ int primary_display_resume(void)
 		if (dsi_force_config)
 			DSI_ForceConfig(1);
 	}
+
+#if defined(CONFIG_SMCDSD_PANEL)
+	if (primary_display_get_power_mode_nolock() == FB_RESUME)
+		disp_lcm_power_enable(pgc->plcm, 1);
+#endif
 #ifdef CONFIG_MTK_HIGH_FRAME_RATE
 		/*DynFPS*/
 		/* whether need init cfg*/
@@ -5189,6 +5241,11 @@ int primary_display_resume(void)
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 		MMPROFILE_FLAG_PULSE, 0, 9);
 
+#if defined(CONFIG_SMCDSD_PANEL)
+	/* From now, MIPI TX command will be written via CMDQ engine */
+	disp_lcm_cmdq(pgc->plcm, 1);
+#endif
+
 	/* primary_display_diagnose(); */
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 		MMPROFILE_FLAG_PULSE, 0, 10);
@@ -5276,8 +5333,15 @@ done:
 	__pm_stay_awake(pri_wk_lock);
 
 	_primary_path_unlock(__func__);
+#if defined(CONFIG_SMCDSD_PANEL)
+	disp_lcm_path_lock(0, pgc->plcm);
+#endif
 	DISPMSG("skip_update:%d\n", skip_update);
 
+#if defined(CONFIG_MTK_VSYNC_PRINT)
+	disp_register_irq_callback(vsync_print_handler);
+	pr_info("%s: vsync_print\n", __func__);
+#endif
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 		MMPROFILE_FLAG_END, 0, 0);
 	ddp_clk_check();

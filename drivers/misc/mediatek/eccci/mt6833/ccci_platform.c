@@ -20,6 +20,12 @@
 #include "ccci_platform.h"
 #include "modem_secure_base.h"
 
+#include <linux/arm-smccc.h>
+
+
+#define MTK_SIP_CCCI_CONTROL_ARCH32		0x82000505
+#define MTK_SIP_CCCI_CONTROL_ARCH64		0xC2000505
+
 #ifdef FEATURE_USING_4G_MEMORY_API
 #include <mt-plat/mtk_lpae.h>
 #endif
@@ -52,6 +58,25 @@ size_t mt_secure_call(
 			arg2, arg3, r1, r2, r3, &res);
 
 	return res.a0;
+}
+
+int ccci_get_md_sec_smem_size_and_update(void)
+{
+#ifdef ENABLE_MD_SEC_SMEM
+	struct arm_smccc_res res;
+
+#ifdef __aarch64__
+	arm_smccc_smc(MTK_SIP_CCCI_CONTROL_ARCH64,
+				UPDATE_MD_SEC_SMEM, 0, 0, 0, 0, 0, 0, &res);
+#else
+	arm_smccc_smc(MTK_SIP_CCCI_CONTROL_ARCH32,
+				UPDATE_MD_SEC_SMEM, 0, 0, 0, 0, 0, 0, &res);
+#endif
+
+	return (int)res.a0;
+#else
+	return 0;
+#endif
 }
 
 /*

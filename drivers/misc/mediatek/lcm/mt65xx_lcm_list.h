@@ -9,6 +9,9 @@
 
 #include <lcm_drv.h>
 
+#if defined(CONFIG_SMCDSD_PANEL)
+extern struct LCM_DRIVER smcdsd_panel_drv;
+#endif
 extern struct LCM_DRIVER otm1282a_hd720_dsi_vdo_60hz_lcm_drv;
 extern struct LCM_DRIVER otm1282a_hd720_dsi_vdo_lcm_drv;
 extern struct LCM_DRIVER nt35595_fhd_dsi_cmd_truly_8163_lcm_drv;
@@ -69,9 +72,6 @@ extern struct LCM_DRIVER nt35510_dsi_vdo_6572_drv;
 extern struct LCM_DRIVER nt35510_dpi_6572_lcm_drv;
 extern struct LCM_DRIVER nt35510_mcu_6572_lcm_drv;
 extern struct LCM_DRIVER nt51012_hd720_dsi_vdo_lcm_drv;
-extern struct LCM_DRIVER nt35532_fhd_dsi_vdo_sharp_lcm_drv;
-extern struct LCM_DRIVER otm1901a_fhd_dsi_vdo_tpv_lcm_drv;
-extern struct LCM_DRIVER r63350a_fhd_dsi_vdo_truly_lcm_drv;
 extern struct LCM_DRIVER r63303_idisplay_lcm_drv;
 extern struct LCM_DRIVER hj080ia_lcm_drv;
 extern struct LCM_DRIVER hj101na02a_lcm_drv;
@@ -329,15 +329,19 @@ extern struct LCM_DRIVER nt36672c_fhdp_dsi_vdo_90hz_shenchao_lcm_drv;
 extern struct LCM_DRIVER nt36672c_fhdp_dsi_vdo_90hz_shenchao_6382_lcm_drv;
 extern struct LCM_DRIVER r66451_fhdp_dsi_cmd_tianma_lcm_drv;
 
-extern struct LCM_DRIVER td4320_fhdp_dsi_vdo_auo_rt4801_lcm_drv;
 extern struct LCM_DRIVER td4320_fhdp_dsi_vdo_auo_rt5081_lcm_drv;
 /*6768 otm */
 extern struct LCM_DRIVER otm1911a_fhdp_dsi_vdo_truly_rt5081_lcm_drv;
 extern struct LCM_DRIVER otm1911a_fhdp_dsi_vdo_truly_rt5081_hdp_lcm_drv;
 extern struct LCM_DRIVER hx83102p_wxga_vdo_incell_boe_lcm_drv;
 extern struct LCM_DRIVER otm1911a_fhdp_dsi_vdo_truly_rt4801_lcm_drv;
-extern struct LCM_DRIVER nt36672c_fhdp_dsi_vdo_120hz_shenchao_6382_lcm_drv;
-extern struct LCM_DRIVER nt36672c_fhdp_dsi_vdo_auo_cphy_90hz_jdi_lcm_drv;
+
+extern struct LCM_DRIVER td4150_hdp_dsi_lm36274_lcm_drv;
+extern struct LCM_DRIVER td4150_hdp_dsi_lm36274_lcm_a12_drv;
+extern struct LCM_DRIVER ili9882n_hdp_dsi_vdo_ilitek_lm36274_lcm_drv;
+extern struct LCM_DRIVER s6e3fc3_fhdp_cmd_lcm_drv;
+extern struct LCM_DRIVER s6e3fc3_fhdp_cmd_a22_lte_lcm_drv;
+extern struct LCM_DRIVER s6e3fc3_hdp_cmd_a22_lte_lcm_drv;
 
 #ifdef BUILD_LK
 extern void mdelay(unsigned long msec);

@@ -19,6 +19,56 @@
 #include "mtu3_debug.h"
 #include "mtu3_trace.h"
 
+#if IS_ENABLED(CONFIG_USB_NOTIFY_PROC_LOG)
+#include <linux/usb_notify.h>
+#endif
+
+#if defined(CONFIG_BATTERY_SAMSUNG)
+static int mtu3_set_vbus_current(int state)
+{
+	struct power_supply *psy;
+	union power_supply_propval pval = {0};
+
+	pr_info("%s : %dmA\n", __func__, state);
+	psy = power_supply_get_by_name("battery");
+	if (psy) {
+		pval.intval = state;
+		psy_do_property("battery", set,
+			POWER_SUPPLY_EXT_PROP_USB_CONFIGURE, pval);
+		power_supply_put(psy);
+	}
+
+	return 0;
+}
+
+static void musb_set_vbus_current_work(struct work_struct *w)
+{
+	struct mtu3 *mtu = container_of(w,
+		struct mtu3, set_vbus_current_work);
+	struct otg_notify *o_notify = get_otg_notify();
+
+	switch (mtu->vbus_current) {
+	case USB_CURRENT_SUSPENDED:
+		/* set vbus current for suspend state is called in usb_notify. */
+		send_otg_notify(o_notify, NOTIFY_EVENT_USBD_SUSPENDED, 1);
+		goto skip;
+	case USB_CURRENT_UNCONFIGURED:
+		send_otg_notify(o_notify, NOTIFY_EVENT_USBD_UNCONFIGURED, 1);
+		break;
+	case USB_CURRENT_HIGH_SPEED:
+	case USB_CURRENT_SUPER_SPEED:
+		send_otg_notify(o_notify, NOTIFY_EVENT_USBD_CONFIGURED, 1);
+		break;
+	default:
+		break;
+	}
+
+	mtu3_set_vbus_current(mtu->vbus_current);
+skip:
+	return;
+}
+#endif
+
 static int ep_fifo_alloc(struct mtu3_ep *mep, u32 seg_size)
 {
 	struct mtu3_fifo_info *fifo = mep->fifo;
@@ -245,17 +295,12 @@ static void mtu3_regs_init(struct mtu3 *mtu)
 		mtu3_clrbits(mbase, U3D_LINK_POWER_CONTROL,
 				SW_U1_REQUEST_ENABLE | SW_U2_REQUEST_ENABLE);
 		/* enable accept LGO_U1/U2 link command from host */
-		if (!(of_find_compatible_node(NULL, NULL, "mediatek,MT6893")
-			|| of_find_compatible_node(NULL, NULL, "mediatek,MT6853"))) {
-			dev_info(mtu->ssusb->dev, "enable accept_lgo\n");
-			mtu3_setbits(mbase, U3D_LINK_POWER_CONTROL,
+		mtu3_setbits(mbase, U3D_LINK_POWER_CONTROL,
 				SW_U1_ACCEPT_ENABLE | SW_U2_ACCEPT_ENABLE);
-			mtu3_setbits(mbase, U3D_MAC_U1_EN_CTRL,
+		mtu3_setbits(mbase, U3D_MAC_U1_EN_CTRL,
 				ACCEPT_BMU_RX_EMPTY_HCK);
-			mtu3_setbits(mbase, U3D_MAC_U2_EN_CTRL,
+		mtu3_setbits(mbase, U3D_MAC_U2_EN_CTRL,
 				ACCEPT_BMU_RX_EMPTY_HCK);
-		} else
-			dev_info(mtu->ssusb->dev, "disable accept_lgo\n");
 		/* device responses to u3_exit from host automatically */
 		mtu3_clrbits(mbase, U3D_LTSSM_CTRL, SOFT_U3_EXIT_EN);
 		/* automatically build U2 link when U3 detect fail */
@@ -318,8 +363,10 @@ void mtu3_ep_stall_set(struct mtu3_ep *mep, bool set)
 	}
 
 	if (!set) {
+		mtu3_qmu_stop(mep);
 		mtu3_ep_reset(mep);
 		mep->flags &= ~MTU3_EP_STALL;
+		mtu3_qmu_resume(mep);
 	} else {
 		mep->flags |= MTU3_EP_STALL;
 	}
@@ -346,6 +393,31 @@ void mtu3_dev_on_off(struct mtu3 *mtu, int is_on)
 		usb_speed_string(mtu->max_speed), is_on ? "+" : "-");
 }
 
+static void mtu3_gadget_set_ready(struct mtu3 *mtu)
+{
+	struct device_node *np = mtu->dev->of_node;
+	struct property *prop = NULL;
+	int ret = 0;
+
+	dev_info(mtu->dev, "update gadget-ready property\n");
+
+	prop = of_find_property(np, "gadget-ready", NULL);
+	if (!prop) {
+		dev_info(mtu->dev, "no gadget-ready node\n");
+
+		prop = kzalloc(sizeof(*prop), GFP_KERNEL);
+		if (!prop)
+			return;
+
+		prop->name = "gadget-ready";
+		ret = of_add_property(np, prop);
+		if (ret) {
+			pr_err("add prop failed\n");
+			return;
+		}
+	}
+}
+
 void mtu3_start(struct mtu3 *mtu)
 {
 	void __iomem *mbase = mtu->mac_base;
@@ -369,8 +441,14 @@ void mtu3_start(struct mtu3 *mtu)
 	mtu3_intr_enable(mtu);
 	mtu->is_active = 1;
 
-	if (mtu->softconnect)
+	if (mtu->softconnect) {
 		mtu3_dev_on_off(mtu, 1);
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
+		store_usblog_notify(NOTIFY_USBSTATE,
+			(void *)"USB_STATE=VBUS:EN:SUCCESS", NULL);
+#endif
+	} else if (!mtu->is_gadget_ready)
+		ssusb_phy_dp_pullup(mtu->ssusb);
 }
 
 void mtu3_stop(struct mtu3 *mtu)
@@ -380,8 +458,13 @@ void mtu3_stop(struct mtu3 *mtu)
 	mtu3_intr_disable(mtu);
 	mtu3_intr_status_clear(mtu);
 
-	if (mtu->softconnect)
+	if (mtu->softconnect) {
 		mtu3_dev_on_off(mtu, 0);
+#if defined(CONFIG_USB_NOTIFY_PROC_LOG)
+		store_usblog_notify(NOTIFY_USBSTATE,
+			(void *)"USB_STATE=VBUS:DIS:SUCCESS", NULL);
+#endif
+	}
 
 	mtu->is_active = 0;
 	mtu3_setbits(mtu->ippc_base, U3D_SSUSB_IP_PW_CTRL2, SSUSB_IP_DEV_PDN);
@@ -847,6 +930,8 @@ static int mtu3_hw_init(struct mtu3 *mtu)
 
 	mtu3_regs_init(mtu);
 
+	mtu3_gadget_set_ready(mtu);
+
 	return 0;
 }
 
@@ -915,6 +1000,11 @@ int ssusb_gadget_init(struct ssusb_mtk *ssusb)
 	ssusb->u3d = mtu;
 	mtu->ssusb = ssusb;
 	mtu->max_speed = usb_get_maximum_speed(dev);
+
+
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	INIT_WORK(&mtu->set_vbus_current_work, musb_set_vbus_current_work);
+#endif
 
 	/* check the max_speed parameter */
 	switch (mtu->max_speed) {

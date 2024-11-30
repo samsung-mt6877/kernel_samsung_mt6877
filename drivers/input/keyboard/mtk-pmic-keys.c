@@ -108,11 +108,11 @@ static const struct mtk_pmic_regs mt6323_regs = {
 
 static const struct mtk_pmic_regs mt6359_regs = {
 	.keys_regs[MTK_PMIC_PWRKEY_INDEX] =
-		MTK_PMIC_KEYS_REGS(INVALID_VALUE,
-		INVALID_VALUE, MT6359_PSC_TOP_INT_CON0, 0x1),
+		MTK_PMIC_KEYS_REGS(MT6359_TOPSTATUS,
+		0x2, MT6359_PSC_TOP_INT_CON0, 0x1),
 	.keys_regs[MTK_PMIC_HOMEKEY_INDEX] =
-		MTK_PMIC_KEYS_REGS(INVALID_VALUE,
-		INVALID_VALUE, MT6359_PSC_TOP_INT_CON0, 0x2),
+		MTK_PMIC_KEYS_REGS(MT6359_TOPSTATUS,
+		0x8, MT6359_PSC_TOP_INT_CON0, 0x2),
 	.release_irq = true,
 	.pmic_rst_reg = MT6359_TOP_RST_MISC,
 	.pwrkey_rst_shift = MT6359_PWRKEY_RST_SHIFT,
@@ -123,7 +123,7 @@ static const struct mtk_pmic_regs mt6359_regs = {
 static const struct mtk_pmic_regs mt6357_regs = {
 	.keys_regs[MTK_PMIC_PWRKEY_INDEX] =
 		MTK_PMIC_KEYS_REGS(MT6357_TOPSTATUS,
-		MT6357_PWRKEY_DEB_MASK,
+		0x2,
 		MT6357_PSC_TOP_INT_CON0,
 		MT6357_RG_INT_EN_PWRKEY_MASK),
 	.keys_regs[MTK_PMIC_HOMEKEY_INDEX] =
@@ -160,6 +160,8 @@ enum mtk_pmic_keys_lp_mode {
 	LP_ONEKEY,
 	LP_TWOKEY,
 };
+
+struct mtk_pmic_keys *keys;
 
 static void mtk_pmic_keys_lp_reset_setup(struct mtk_pmic_keys *keys,
 		const struct mtk_pmic_regs *pmic_regs)
@@ -292,6 +294,56 @@ static int mtk_pmic_key_setup(struct mtk_pmic_keys *keys,
 	return 0;
 }
 
+int mtk_pmic_pwrkey_status(void)
+{
+	struct mtk_pmic_keys_info *pwrkey;
+	const struct mtk_pmic_keys_regs *regs;
+	u32 key_deb, pressed;
+
+	if (!keys)
+		return -EINVAL;
+
+	pwrkey = &keys->keys[MTK_PMIC_PWRKEY_INDEX];
+	regs = pwrkey->regs;
+
+	regmap_read(keys->regmap, regs->deb_reg, &key_deb);
+	dev_info(keys->dev, "Read register 0x%x and mask 0x%x and value: 0x%x\n",
+		 regs->deb_reg, regs->deb_mask, key_deb);
+	key_deb &= regs->deb_mask;
+	pressed = !key_deb;
+
+	dev_info(keys->dev, "%s power key\n", pressed ? "pressed" : "released");
+
+	return pressed;
+}
+EXPORT_SYMBOL(mtk_pmic_pwrkey_status);
+
+#ifdef CONFIG_SEC_DEBUG
+int mtk_pmic_homekey_status(void)
+{
+	struct mtk_pmic_keys_info *homekey;
+	const struct mtk_pmic_keys_regs *regs;
+	u32 key_deb, pressed;
+
+	if (!keys)
+		return -EINVAL;
+
+	homekey = &keys->keys[MTK_PMIC_HOMEKEY_INDEX];
+	regs = homekey->regs;
+
+	regmap_read(keys->regmap, regs->deb_reg, &key_deb);
+	dev_info(keys->dev, "Read register 0x%x and mask 0x%x and value: 0x%x\n",
+		 regs->deb_reg, regs->deb_mask, key_deb);
+	key_deb &= regs->deb_mask;
+	pressed = !key_deb;
+
+	dev_info(keys->dev, "%s home key\n", pressed ? "pressed" : "released");
+
+	return pressed;
+}
+EXPORT_SYMBOL(mtk_pmic_homekey_status);
+#endif
+
 static int __maybe_unused mtk_pmic_keys_suspend(struct device *dev)
 {
 	struct mtk_pmic_keys *keys = dev_get_drvdata(dev);
@@ -346,7 +398,6 @@ static int mtk_pmic_keys_probe(struct platform_device *pdev)
 	unsigned int keycount;
 	struct mt6397_chip *pmic_chip = dev_get_drvdata(pdev->dev.parent);
 	struct device_node *node = pdev->dev.of_node, *child;
-	struct mtk_pmic_keys *keys;
 	const struct mtk_pmic_regs *mtk_pmic_regs;
 	struct input_dev *input_dev;
 	const struct of_device_id *of_id =

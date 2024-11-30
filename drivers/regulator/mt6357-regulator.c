@@ -241,7 +241,7 @@ static const u32 vcn33_wifi_voltages[] = {
 };
 
 static const u32 vcama_voltages[] = {
-	2500000, 2800000,
+	1800000, 2500000, 2800000,
 };
 
 static const u32 vcamd_voltages[] = {
@@ -297,7 +297,7 @@ static const u32 vcn33_wifi_idx[] = {
 };
 
 static const u32 vcama_idx[] = {
-	7, 10,
+	0, 7, 10,
 };
 
 static const u32 vcamd_idx[] = {

@@ -41,3 +41,17 @@ config PHY_MTK_USB
 	  Enables support for ASIC PHY.
 	  This driver provides interface to interact with USB 2.0 and
 	  USB 3.0 PHY that is part of the Mediatek SOC.
+
+config SAMSUNG_PHY_TUNE
+    bool "SS PHY tune"
+    depends on PHY_MTK_TPHY
+    select SAMSUNG_PHY_TUNING
+    help
+	  Support SS phy tune.
+
+config ADB_PHY_TUNING
+    bool "ADB PHY tuning"
+    depends on SAMSUNG_PHY_TUNE
+    select ADB_USB_TUNING
+    help
+	  ADB usb phy tuning support.

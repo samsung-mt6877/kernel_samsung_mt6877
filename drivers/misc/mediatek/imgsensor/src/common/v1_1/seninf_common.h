@@ -6,13 +6,13 @@
 #ifndef __SENINF_COMMON_H__
 #define __SENINF_COMMON_H__
 
-#define PREFIX "[seninf]"
+#define PREFIX "[seninf D/D]"
 
 #define DEBUG_CAMERA_HW_K
 #ifdef DEBUG_CAMERA_HW_K
-#define PK_DBG(fmt, arg...)  pr_debug(PREFIX fmt, ##arg)
-#define PK_PR_ERR(fmt, arg...)  pr_err(fmt, ##arg)
-#define PK_INFO(fmt, arg...) pr_debug(PREFIX fmt, ##arg)
+#define PK_DBG(fmt, arg...)     pr_debug(PREFIX "[%s] " fmt, __func__, ##arg)
+#define PK_PR_ERR(fmt, arg...)  pr_err(PREFIX "[%s] " fmt, __func__, ##arg)
+#define PK_INFO(fmt, arg...)    pr_info(PREFIX "[%s] " fmt, __func__, ##arg)
 #else
 #define PK_DBG(fmt, arg...)
 #define PK_PR_ERR(fmt, arg...)  pr_err(fmt, ##arg)

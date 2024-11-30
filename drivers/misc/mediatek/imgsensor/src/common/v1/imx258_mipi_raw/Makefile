@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2022 Samsung Electronics Co., Ltd
 
-obj-y += imx258_pdafotp.o
-obj-y += imx258mipiraw_Sensor.o
+SENSOR_NAME  := imx258
 
+obj-y += $(SENSOR_NAME)mipiraw_Sensor.o
+$(info used driver: $(SENSOR_NAME))

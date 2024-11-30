@@ -608,7 +608,7 @@ static inline unsigned int uffs(unsigned int x)
 #define is_card_present(h)      (((struct msdc_host *)(h))->card_inserted)
 #define is_card_sdio(h)         (((struct msdc_host *)(h))->hw->register_pm)
 
-#define CMD_TIMEOUT             (HZ/10 * 5)     /* 100ms x5 */
+#define CMD_TIMEOUT             (HZ/100 * 5)     /* 10ms x5 */
 #define CMD_CQ_TIMEOUT          (HZ    * 3)
 #define DAT_TIMEOUT             (HZ    * 5)     /* 1000ms x5 */
 #define POLLING_BUSY            (HZ    * 3)
@@ -616,6 +616,8 @@ static inline unsigned int uffs(unsigned int x)
 
 /* data timeout for worker */
 #define DATA_TIMEOUT_MS         (1000  * 30)    /* 30s */
+/* The max erase timeout for sdcard */
+#define SD_ERASE_TIMEOUT_MS	(60 * 1000) /* 60 s */
 extern struct msdc_host *mtk_msdc_host[];
 extern unsigned int msdc_latest_transfer_mode[HOST_MAX_NUM];
 extern u32 latest_int_status[];

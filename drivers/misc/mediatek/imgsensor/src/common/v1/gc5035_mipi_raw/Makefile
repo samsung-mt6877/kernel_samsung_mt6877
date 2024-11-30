@@ -1,3 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2022 Samsung Electronics Co., Ltd
 
-obj-y += gc5035mipi_Sensor.o
+SENSOR_NAME  := gc5035
+
+obj-y += $(SENSOR_NAME)mipiraw_Sensor.o
+$(info used driver: $(SENSOR_NAME))

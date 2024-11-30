@@ -10,6 +10,16 @@
 #include <mt-plat/upmu_common.h>
 #include <mt-plat/mt6739/include/mach/upmu_sw.h>
 
+signed int __attribute__((weak)) battery_get_precise_soc(void)
+{
+	return 0;
+}
+
+signed int __attribute__((weak)) battery_get_precise_uisoc(void)
+{
+	return 0;
+}
+
 #if (CONFIG_MTK_GAUGE_VERSION != 30)
 signed int battery_get_bat_voltage(void)
 {
@@ -100,20 +110,21 @@ signed int battery_get_soc(void)
 
 signed int battery_get_uisoc(void)
 {
+// workaround for mt6739
+	int boot_mode = 0;
+	//int boot_mode = get_boot_mode();
 	struct mtk_battery *gm = get_mtk_battery();
-	if (gm != NULL) {
-		int boot_mode = gm->boot_mode;
 
-		if ((boot_mode == META_BOOT) ||
-			(boot_mode == ADVMETA_BOOT) ||
-			(boot_mode == FACTORY_BOOT) ||
-			(boot_mode == ATE_FACTORY_BOOT))
-			return 75;
-		else if (boot_mode == 0)
-			return gm->ui_soc;
-	}
+	if ((boot_mode == META_BOOT) ||
+		(boot_mode == ADVMETA_BOOT) ||
+		(boot_mode == FACTORY_BOOT) ||
+		(boot_mode == ATE_FACTORY_BOOT))
+		return 75;
 
-	return 50;
+	if (gm != NULL)
+		return gm->ui_soc;
+	else
+		return 50;
 }
 
 signed int battery_get_bat_temperature(void)

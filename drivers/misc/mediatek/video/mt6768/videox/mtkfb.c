@@ -259,6 +259,10 @@ static int mtkfb1_blank(int blank_mode, struct fb_info *info)
 static int mtkfb_blank(int blank_mode, struct fb_info *info)
 {
 	enum mtkfb_power_mode prev_pm = primary_display_get_power_mode();
+#if defined(CONFIG_SMCDSD_PANEL)
+	pr_info("%s + blank_mode: %d, %s\n",
+			__func__, blank_mode, blank_mode == FB_BLANK_UNBLANK ? "UNBLANK" : "POWERDOWN");
+#endif
 
 	switch (blank_mode) {
 	case FB_BLANK_UNBLANK:
@@ -295,6 +299,9 @@ static int mtkfb_blank(int blank_mode, struct fb_info *info)
 	default:
 		return -EINVAL;
 	}
+#if defined(CONFIG_SMCDSD_PANEL)
+	pr_info("%s - blank_mode: %d\n", __func__, blank_mode);
+#endif
 	return 0;
 }
 
@@ -1113,7 +1120,6 @@ static int mtkfb_ioctl(struct fb_info *info, unsigned int cmd,
 		enum mtkfb_aod_power_mode aod_pm = MTKFB_AOD_POWER_MODE_ERROR;
 
 		aod_pm = (enum mtkfb_aod_power_mode)arg;
-		ret = mtkfb_aod_mode_switch(arg);
 
 		break;
 	}
@@ -2644,7 +2650,7 @@ static int mtkfb_probe(struct platform_device *pdev)
 	fbdev->state = MTKFB_ACTIVE;
 
 	if (!strcmp(mtkfb_find_lcm_driver(),
-		"nt35521_hd_dsi_vdo_truly_rt5081_drv")) {
+		"ea8076g_fhdplus_dis_cmd_drv")) {
 #ifdef CONFIG_MTK_CCCI_DRIVER
 		register_ccci_sys_call_back(MD_SYS1,
 			MD_DISPLAY_DYNAMIC_MIPI, mipi_clk_change);
@@ -2701,7 +2707,36 @@ static int mtkfb_resume(struct platform_device *pdev)
 	MSG_FUNC_LEAVE();
 	return 0;
 }
+#if defined(CONFIG_SMCDSD_PANEL)
+static void mtkfb_shutdown(struct platform_device *pdev)
+{
+	struct mtkfb_device *fbdev = dev_get_drvdata(&pdev->dev);
 
+	MTKFB_LOG("[FB Driver] mtkfb_shutdown()\n");
+	pr_info("%s: ++\n", __func__);
+
+	if (!lock_fb_info((fbdev->fb_info))) {
+		MTKFB_LOG("%s: fblock is failed\n", __func__);
+		return;
+	}
+
+	if (primary_display_is_sleepd()) {
+		MTKFB_LOG("mtkfb has been power off\n");
+		unlock_fb_info(fbdev->fb_info);
+		return;
+	}
+	smcdsd_simple_notifier_call_chain(FB_EARLY_EVENT_BLANK, FB_BLANK_POWERDOWN);
+	primary_display_set_power_mode(FB_SUSPEND);
+	primary_display_suspend();
+
+	smcdsd_simple_notifier_call_chain(FB_EVENT_BLANK, FB_BLANK_POWERDOWN);
+	unlock_fb_info(fbdev->fb_info);
+
+	MTKFB_LOG("[FB Driver] leave mtkfb_shutdown\n");
+	pr_info("%s: --\n", __func__);
+}
+
+#else
 static void mtkfb_shutdown(struct platform_device *pdev)
 {
 	MTKFB_LOG("[FB Driver] %s()\n", __func__);
@@ -2713,7 +2748,7 @@ static void mtkfb_shutdown(struct platform_device *pdev)
 	primary_display_suspend();
 	MTKFB_LOG("[FB Driver] leave %s\n", __func__);
 }
-
+#endif
 bool mtkfb_is_suspend(void)
 {
 	return primary_display_is_sleepd();

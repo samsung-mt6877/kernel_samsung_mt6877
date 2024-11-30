@@ -20,7 +20,6 @@
 #endif
 
 struct CcuMemInfo {
-	unsigned int chksum;
 	int shareFd;
 	char *va;
 	unsigned int align_mva;
