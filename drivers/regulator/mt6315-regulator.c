@@ -326,6 +326,10 @@ static const struct regulator_linear_range mt_volt_range1[] = {
 	REGULATOR_LINEAR_RANGE(300000, 0x30, 0xbf, 6250),
 };
 
+static const struct regulator_linear_range mt_volt_range2[] = {
+	REGULATOR_LINEAR_RANGE(0, 0x0, 0xbf, 6250),
+};
+
 static int mt6315_regulator_disable(struct regulator_dev *rdev)
 {
 	int ret = 0;
@@ -523,8 +527,13 @@ static struct mt6315_regulator_info mt6315_7_regulators[] = {
 static struct mt6315_regulator_info mt6315_3_regulators[] = {
 	MT_BUCK("3_vbuck1", 3_VBUCK1, 300000, 1193750, 6250,
 		mt_volt_range1, 1, MT_BUCK_VOL_EN, 0x3),
+#if defined(CONFIG_MACH_MT6877)
+	MT_BUCK("3_vbuck3", 3_VBUCK3, 300000, 1193750, 6250,
+		mt_volt_range2, 3, MT_BUCK_VOL_EN, 0x4),
+#else
 	MT_BUCK("3_vbuck3", 3_VBUCK3, 300000, 1193750, 6250,
 		mt_volt_range1, 3, MT_BUCK_VOL_EN, 0x4),
+#endif
 	MT_BUCK("3_vbuck4", 3_VBUCK4, 300000, 1193750, 6250,
 		mt_volt_range1, 4, MT_BUCK_VOL_EN, 0x8),
 };

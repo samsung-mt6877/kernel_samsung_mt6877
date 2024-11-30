@@ -1017,6 +1017,7 @@ int cm_mgr_get_bw(void)
 }
 
 #ifdef USE_CPU_TO_DRAM_MAP
+#if 0
 int cm_mgr_cpu_opp_to_dram[CM_MGR_CPU_OPP_SIZE] = {
 /* start from cpu opp 0 */
 	DDR_OPP_1,
@@ -1036,6 +1037,27 @@ int cm_mgr_cpu_opp_to_dram[CM_MGR_CPU_OPP_SIZE] = {
 	PM_QOS_DDR_OPP_DEFAULT_VALUE,
 	PM_QOS_DDR_OPP_DEFAULT_VALUE,
 };
+#else
+int cm_mgr_cpu_opp_to_dram[CM_MGR_CPU_OPP_SIZE] = {
+/* start from cpu opp 0 */
+	DDR_OPP_1,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+	DDR_OPP_7,
+};
+#endif
 
 static void cm_mgr_process(struct work_struct *work)
 {
@@ -1051,8 +1073,8 @@ void cm_mgr_update_dram_by_cpu_opp(int cpu_opp)
 		return;
 
 	if (!cm_mgr_cpu_map_dram_enable) {
-		if (cm_mgr_cpu_to_dram_opp != PM_QOS_DDR_OPP_DEFAULT_VALUE) {
-			cm_mgr_cpu_to_dram_opp = PM_QOS_DDR_OPP_DEFAULT_VALUE;
+		if (cm_mgr_cpu_to_dram_opp != MTK_PM_QOS_DDR_OPP_DEFAULT_VALUE) {
+			cm_mgr_cpu_to_dram_opp = MTK_PM_QOS_DDR_OPP_DEFAULT_VALUE;
 			ret = schedule_delayed_work(&cm_mgr_work, 1);
 		}
 		return;

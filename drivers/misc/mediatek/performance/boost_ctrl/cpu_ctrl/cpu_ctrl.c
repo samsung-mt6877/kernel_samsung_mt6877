@@ -143,6 +143,10 @@ int update_userlimit_cpu_freq(int kicker, int num_cluster
 	}
 
 	for (i = 0; i < CPU_MAX_KIR; i++) {
+#ifdef CONFIG_CPU_FREQ_LIMIT
+		if (i == CPU_KIR_SEC_OVERLIMIT)
+			continue;
+#endif
 		for_each_perfmgr_clusters(j) {
 			final_freq[j].min
 				= MAX(freq_set[i][j].min, final_freq[j].min);
@@ -153,14 +157,33 @@ int update_userlimit_cpu_freq(int kicker, int num_cluster
 				MIN(freq_set[i][j].max, final_freq[j].max) :
 				MAX(freq_set[i][j].max, final_freq[j].max);
 #else
+#ifdef CONFIG_CPU_FREQ_LIMIT
+			final_freq[j].max
+				= final_freq[j].max != -1 &&
+				freq_set[i][j].max != -1 ?
+				MIN(freq_set[i][j].max, final_freq[j].max) :
+				MAX(freq_set[i][j].max, final_freq[j].max);
+#else
 			final_freq[j].max
 				= MAX(freq_set[i][j].max, final_freq[j].max);
 #endif
+#endif
+
+#ifndef CONFIG_CPU_FREQ_LIMIT
 			if (final_freq[j].min > final_freq[j].max &&
 					final_freq[j].max != -1)
 				final_freq[j].max = final_freq[j].min;
+#endif
 		}
 	}
+
+#ifdef CONFIG_CPU_FREQ_LIMIT
+	for_each_perfmgr_clusters(j) {
+		if (freq_set[CPU_KIR_SEC_LIMIT][j].min != -1 || freq_set[CPU_KIR_SEC_TOUCH][j].min != -1)
+			if (freq_set[CPU_KIR_SEC_OVERLIMIT][j].max != -1 && final_freq[j].max != -1)
+				final_freq[j].max = MAX(freq_set[CPU_KIR_SEC_OVERLIMIT][j].max, final_freq[j].max);
+	}
+#endif
 
 	for_each_perfmgr_clusters(i) {
 		current_freq[i].min = final_freq[i].min;
@@ -337,9 +360,6 @@ static ssize_t perfmgr_boot_freq_proc_write(struct file *filp,
 			sizeof(struct cpu_ctrl_data), GFP_KERNEL);
 	if (!freq_limit)
 		goto out;
-
-	for_each_perfmgr_clusters(cid)
-		freq_limit[cid].min = freq_limit[cid].max = -1;
 
 	tmp = buf;
 	while ((tok = strsep(&tmp, " ")) != NULL) {

@@ -50,6 +50,7 @@
 #include "disp_session.h"
 #include "disp_lowpower.h"
 #include "disp_drv_log.h"
+#include "mtk_notify.h"
 
 #if IS_ENABLED(CONFIG_DEBUG_FS)
 static struct dentry *debugfs;
@@ -539,6 +540,12 @@ static void process_dbg_opt(const char *opt)
 			tmp += snprintf(buf + tmp, buf_size_left - tmp,
 					"para[%d]=0x%x,", i, para[i]);
 		DISPMSG("%s\n", buf);
+	} else if (strncmp(opt, "lcd:", 4) == 0) {
+		if (strncmp(opt + 4, "on", 2) == 0) {
+			noti_uevent_user(&uevent_data, 1);
+		} else if (strncmp(opt + 4, "off", 3) == 0) {
+			noti_uevent_user(&uevent_data, 0);
+		}
 	} else {
 		dbg_buf[0] = '\0';
 		goto Error;

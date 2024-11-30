@@ -460,6 +460,13 @@ static int handle_standard_request(struct mtu3 *mtu,
 		handled = 1;
 		break;
 	case USB_REQ_SET_CONFIGURATION:
+#if defined(CONFIG_BATTERY_SAMSUNG)
+		if (mtu->g.speed == USB_SPEED_SUPER)
+			mtu->vbus_current = USB_CURRENT_SUPER_SPEED;
+		else
+			mtu->vbus_current = USB_CURRENT_HIGH_SPEED;
+		schedule_work(&mtu->set_vbus_current_work);
+#endif
 		if (state == USB_STATE_ADDRESS) {
 			usb_gadget_set_state(&mtu->g,
 					USB_STATE_CONFIGURED);

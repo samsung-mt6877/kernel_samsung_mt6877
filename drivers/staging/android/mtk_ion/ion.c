@@ -45,6 +45,8 @@
 #include "mtk/mtk_ion.h"
 #include "mtk/ion_drv_priv.h"
 
+#include <trace/systrace_mark.h>
+
 #ifdef CONFIG_MTK_IOMMU_V2
 #include <mach/pseudo_m4u.h>
 #endif
@@ -655,6 +657,9 @@ struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
 	unsigned long long start, end;
 	unsigned int heap_mask = ~0;
 	unsigned int alloc_err_heap = 0;
+#ifdef CONFIG_ION_RBIN_HEAP
+	bool rbin_try = false;
+#endif
 
 	pr_debug("%s: len %zu align %zu heap_id_mask %u flags %x\n", __func__,
 		 len, align, heap_id_mask, flags);
@@ -664,6 +669,13 @@ struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
 	 */
 	if (heap_id_mask == heap_mask)
 		heap_id_mask = ION_HEAP_MULTIMEDIA_MASK;
+
+#ifdef CONFIG_ION_RBIN_HEAP
+	if (heap_id_mask == ION_HEAP_CAMERA_MASK) {
+		rbin_try = true;
+		heap_id_mask = ION_HEAP_RBIN_MASK;
+	}
+#endif
 
 	len = PAGE_ALIGN(len);
 
@@ -690,16 +702,30 @@ struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
 	 * succeeded or all heaps have been tried
 	 */
 	down_read(&dev->lock);
+#ifdef CONFIG_ION_RBIN_HEAP
+repeat:
+#endif
 	plist_for_each_entry(heap, &dev->heaps, node) {
 		/* if the caller didn't specify this heap id */
 		if (!((1 << heap->id) & heap_id_mask))
 			continue;
+		systrace_mark_begin("%s(%s, %zu, 0x%x, 0x%x)\n",
+			__func__, heap->name, len, heap_id_mask, flags);
 		buffer = ion_buffer_create(heap, dev, len, align, flags);
+		systrace_mark_end();
 		if (!IS_ERR(buffer))
 			break;
 		if (IS_ERR(buffer))
 			alloc_err_heap |= (1 << heap->id);
 	}
+
+#ifdef CONFIG_ION_RBIN_HEAP
+	if (rbin_try && (!buffer || IS_ERR(buffer))) {
+		rbin_try = false;
+		heap_id_mask = ION_HEAP_CAMERA_MASK;
+		goto repeat;
+	}
+#endif
 	up_read(&dev->lock);
 
 	if (!buffer) {
@@ -766,6 +792,7 @@ struct ion_handle *__ion_alloc(struct ion_client *client, size_t len,
 	ion_history_count_kick(true, len);
 #endif
 #endif
+
 
 	return handle;
 }
@@ -1288,7 +1315,8 @@ static int ion_iommu_heap_type(struct ion_buffer *buffer)
 
 	if (buffer->heap->type == (int)ION_HEAP_TYPE_FB ||
 	    buffer->heap->type == (int)ION_HEAP_TYPE_MULTIMEDIA ||
-	    buffer->heap->type == (int)ION_HEAP_TYPE_MULTIMEDIA_SEC) {
+	    buffer->heap->type == (int)ION_HEAP_TYPE_MULTIMEDIA_SEC ||
+	    buffer->heap->type == (int)ION_HEAP_TYPE_RBIN) {
 		return 1;
 	}
 	return 0;
@@ -2255,6 +2283,7 @@ static int ion_debug_heap_show(struct seq_file *s, void *unused)
 	size_t total_orphaned_size = 0;
 	unsigned long long current_ts = 0;
 	unsigned int heap_id = heap->id;
+	unsigned int mm_id = ION_HEAP_TYPE_MULTIMEDIA;
 	unsigned int cam_id = ION_HEAP_TYPE_MULTIMEDIA_FOR_CAMERA;
 
 	seq_printf(s, "total sz[%llu]\n",

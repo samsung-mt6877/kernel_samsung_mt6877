@@ -37,6 +37,12 @@
 #define PCM_32K_TICKS_PER_SEC		(32768)
 #define PCM_TICK_TO_SEC(TICK)	(TICK / PCM_32K_TICKS_PER_SEC)
 
+#ifdef CONFIG_SEC_PM
+#define SPM_VIRQ (999)
+#endif /* CONFIG_SEC_PM */
+
+
+
 #ifdef CONFIG_MTK_LPM_GS_DUMP_SUPPORT
 struct MT6886_LOGGER_NODE mt6833_log_gs_idle;
 struct MTK_LPM_GS_IDLE_INFO {
@@ -509,7 +515,10 @@ static int mt6833_show_message(struct mt6833_spm_wake_status *wakesrc, int type,
 			LOG_BUF_OUT_SZ - log_size,
 			" b_sw_flag = 0x%x 0x%x",
 			wakesrc->b_sw_flag0, wakesrc->b_sw_flag1);
-
+#ifdef CONFIG_SEC_PM
+				if (!strcmp(scenario, "suspend"))
+					log_wakeup_reason_spm(SPM_VIRQ, NULL, wakesrc->r13);
+#endif /* CONFIG_SEC_PM */
 		wr =  WR_ABORT;
 	} else {
 		if (wakesrc->r12 & R12_PCM_TIMER) {
@@ -656,6 +665,9 @@ static int mt6833_show_message(struct mt6833_spm_wake_status *wakesrc, int type,
 
 	if (type == MT_LPM_ISSUER_SUSPEND) {
 		printk_deferred("[name:spm&][SPM] %s", log_buf);
+#ifdef CONFIG_SEC_PM
+		log_wakeup_reason_spm(SPM_VIRQ, buf, 0);
+#endif /* CONFIG_SEC_PM */
 		mt6833_suspend_show_detailed_wakeup_reason(wakesrc);
 		mt6833_suspend_spm_rsc_req_check(wakesrc);
 

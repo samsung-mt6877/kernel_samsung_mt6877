@@ -8,6 +8,8 @@
 #include "eeprom_i2c_custom_driver.h"
 #include "kd_imgsensor.h"
 
+#define MAX_EEPROM_SIZE_16K 0x4000
+
 struct stCAM_CAL_LIST_STRUCT g_camCalList[] = {
 	/*Below is commom sensor */
 	{IMX230_SENSOR_ID, 0xA0, Common_read_region},
@@ -51,6 +53,13 @@ struct stCAM_CAL_LIST_STRUCT g_camCalList[] = {
 	{HI556_SENSOR_ID, 0x51, Common_read_region},
 	{S5K5E8YX_SENSOR_ID, 0x5a, Common_read_region},
 	{S5K5E8YXREAR2_SENSOR_ID, 0x5a, Common_read_region},
+	{S5KGM2_SENSOR_ID, 0xB0, Common_read_region, MAX_EEPROM_SIZE_16K},
+	{GC02M1_SENSOR_ID, 0xA4, Common_read_region},
+	{GC5035_SENSOR_ID, 0x7E, Common_read_otp_cal},
+	{SR846D_SENSOR_ID, 0x40, Common_read_otp_cal},
+	{GC02M1B_SENSOR_ID, 0x6E, Common_read_otp_cal},
+	{S5K4HAYX_SENSOR_ID, 0x5A, Common_read_otp_cal},
+	{S5K2P6_SENSOR_ID, 0xB0, Common_read_region, MAX_EEPROM_SIZE_16K},
 	/*  ADD before this line */
 	{0, 0, 0}       /*end of list */
 };

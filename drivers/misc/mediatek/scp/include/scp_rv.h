@@ -201,5 +201,8 @@ extern void scp_deregister_feature(enum feature_id id);
 /* APIs for reset scp */
 extern void scp_wdt_reset(int cpu_id);
 
+#ifdef CONFIG_SHUB
+extern int get_scp_dump_size(void);
+#endif
 #endif
 

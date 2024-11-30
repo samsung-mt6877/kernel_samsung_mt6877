@@ -172,7 +172,7 @@ struct vow_dump_info_t {
 	uint32_t      size;               // size of reseved buffer (bytes)
 	uint32_t      scp_dump_offset[VOW_MAX_CH_NUM]; // return data offset from scp
 	uint32_t      scp_dump_size[VOW_MAX_CH_NUM];   // return data size from scp
-	char         *kernel_dump_addr;  // kernel internal buffer address
+	short         *kernel_dump_addr;  // kernel internal buffer address
 	unsigned int  kernel_dump_idx;    // current index of kernel_dump_addr
 	unsigned int  kernel_dump_size;   // size of kernel_dump_ptr buffer (bytes)
 	unsigned long user_dump_addr;     // addr of user dump buffer
@@ -376,6 +376,7 @@ bool vow_ipi_rceive_ack(unsigned int msg_id,
 		break;
 	case IPIMSG_VOW_SET_BARGEIN_ON:
 	case IPIMSG_VOW_SET_BARGEIN_OFF:
+	case IPIMSG_VOW_SET_BIXBY_ENGINE_MODE:
 		result = true;
 		break;
 	default:
@@ -454,7 +455,7 @@ static void vow_service_Init(void)
 {
 	int I;
 	bool ret;
-	unsigned int vow_ipi_buf[4];
+	unsigned int vow_ipi_buf[3];
 
 	VOWDRV_DEBUG("%s():%x\n", __func__, init_flag);
 	/* common part */
@@ -1393,7 +1394,7 @@ static void vow_service_GetVowDumpData(void)
 					size = temp_dump_info.scp_dump_size[0] * 2;
 				}
 				vow_interleaving(
-					(short *)(&temp_dump_info.kernel_dump_addr[idx]),
+					&temp_dump_info.kernel_dump_addr[idx],
 					(short *)(temp_dump_info.vir_addr +
 						temp_dump_info.scp_dump_offset[0]),
 					(short *)(temp_dump_info.vir_addr +
@@ -1997,8 +1998,6 @@ static ssize_t VowDrv_SetPhase1Debug(struct device *kobj,
 	if (kstrtouint(buf, 0, &enable) != 0)
 		return -EINVAL;
 
-	vowserv.force_phase_stage = (enable == 1) ? FORCE_PHASE1 : NO_FORCE;
-
 	VowDrv_SetFlag(VOW_FLAG_FORCE_PHASE1_DEBUG, enable);
 	return n;
 }
@@ -2030,8 +2029,6 @@ static ssize_t VowDrv_SetPhase2Debug(struct device *kobj,
 
 	if (kstrtouint(buf, 0, &enable) != 0)
 		return -EINVAL;
-
-	vowserv.force_phase_stage = (enable == 1) ? FORCE_PHASE2 : NO_FORCE;
 
 	VowDrv_SetFlag(VOW_FLAG_FORCE_PHASE2_DEBUG, enable);
 	return n;
@@ -2245,7 +2242,6 @@ static ssize_t VowDrv_SetSWIPLog(struct device *kobj,
 	if (kstrtouint(buf, 0, &enable) != 0)
 		return -EINVAL;
 
-	vowserv.swip_log_enable = (enable == 1) ? true : false;
 	VowDrv_SetFlag(VOW_FLAG_SWIP_LOG_PRINT, enable);
 	return n;
 }
@@ -2353,6 +2349,24 @@ static int VowDrv_release(struct inode *inode, struct file *fp)
 	if (!(fp->f_mode & FMODE_WRITE || fp->f_mode & FMODE_READ))
 		return -ENODEV;
 	return 0;
+}
+
+static bool VowDrv_SetWakeupMode(unsigned int mode)
+{
+	bool ret = false;
+	unsigned int vow_ipi_buf[1];
+
+	VOWDRV_DEBUG("%s(), set:%x\n", __func__, mode);
+	vow_ipi_buf[0] = mode;
+
+	ret = vow_ipi_send(IPIMSG_VOW_SET_BIXBY_ENGINE_MODE,
+			   1,
+			   &vow_ipi_buf[0],
+			   VOW_IPI_NEED_ACK);
+	if (ret == 0)
+		VOWDRV_DEBUG("IPIMSG_VOW_SET_BIXBY_ENGINE_MODE ipi send error\n\r");
+
+	return ret;
 }
 
 static long VowDrv_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
@@ -2607,6 +2621,11 @@ static long VowDrv_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 	}
 		break;
 #endif
+	case VOW_SET_WAKEUP_MODE:
+		VOWDRV_DEBUG("VOW_SET_WAKEUP_MODE, irq: %d", (unsigned int)arg);
+		if (!VowDrv_SetWakeupMode((unsigned int)arg))
+			ret = -EFAULT;
+		break;
 	default:
 		VOWDRV_DEBUG("vow WrongParameter(%lu)", arg);
 		break;
@@ -2636,6 +2655,7 @@ static long VowDrv_compat_ioctl(struct file *fp,
 	case VOW_BARGEIN_ON:
 	case VOW_BARGEIN_OFF:
 	case VOW_GET_GOOGLE_ENGINE_VER:
+	case VOW_SET_WAKEUP_MODE:
 		ret = fp->f_op->unlocked_ioctl(fp, cmd, arg);
 		break;
 	case VOW_MODEL_START:
@@ -2761,6 +2781,14 @@ static ssize_t VowDrv_read(struct file *fp,
 	bool dsp_inform_tx_flag = false;
 
 	VOWDRV_DEBUG("+%s()+\n", __func__);
+	if (count != sizeof(struct vow_eint_data_struct_t)) {
+		VOWDRV_DEBUG(
+			"%s(), cpy incorrect size to user, size=%d, correct size=%d, exit\n",
+			__func__,
+			count,
+			sizeof(struct vow_eint_data_struct_t));
+		goto exit;
+	}
 	VowDrv_SetVowEINTStatus(VOW_EINT_RETRY);
 
 	if (VowDrv_Wait_Queue_flag == 0)

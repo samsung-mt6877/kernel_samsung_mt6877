@@ -74,6 +74,12 @@ enum {
 	UFS_UPIU_RPMB_WLUN		= 0xC4,
 };
 
+/* WriteBooster buffer mode */
+enum {
+	WB_BUF_MODE_LU_DEDICATED	= 0x0,
+	WB_BUF_MODE_SHARED		= 0x1,
+};
+
 /*
  * UFS Protocol Information Unit related definitions
  */
@@ -115,6 +121,12 @@ enum {
 	UPIU_CMD_FLAGS_READ	= 0x40,
 };
 
+/* UPIU Command Priority flags */
+enum {
+	UPIU_CMD_PRIO_NONE	= 0x00,
+	UPIU_CMD_PRIO_HIGH	= 0x04,
+};
+
 /* UPIU Task Attributes */
 enum {
 	UPIU_TASK_ATTR_SIMPLE	= 0x00,
@@ -142,11 +154,9 @@ enum flag_idn {
 	QUERY_FLAG_IDN_BUSY_RTC				= 0x09,
 	QUERY_FLAG_IDN_RESERVED3			= 0x0A,
 	QUERY_FLAG_IDN_PERMANENTLY_DISABLE_FW_UPDATE	= 0x0B,
-#if defined(CONFIG_SCSI_UFS_TW)
 	QUERY_FLAG_IDN_TW_EN				= 0x0E,
 	QUERY_FLAG_IDN_TW_BUF_FLUSH_EN			= 0x0F,
 	QUERY_FLAG_IDN_TW_FLUSH_DURING_HIBERN = 0x10,
-#endif
 #if defined(CONFIG_SCSI_SKHPB)
 	QUERY_FLAG_IDN_HPB_RESET	= 0x11,  /* JEDEC version */
 #endif
@@ -184,6 +194,7 @@ enum attr_idn {
 	QUERY_ATTR_IDN_TW_BUF_LIFETIME_EST	= 0x1E,
 	QUERY_ATTR_CUR_TW_BUF_SIZE		= 0x1F,
 #endif
+	QUERY_ATTR_IDN_AVL_TW_BUF_SIZE	= 0x1D,
 #if defined(CONFIG_SCSI_UFS_FEATURE)
 	QUERY_ATTR_IDN_SUP_VENDOR_OPTIONS	= 0xFF,
 #endif
@@ -217,6 +228,11 @@ enum ufs_desc_def_size {
 	QUERY_DESC_GEOMETRY_DEF_SIZE		= 0x48,
 	QUERY_DESC_POWER_DEF_SIZE		= 0x62,
 	QUERY_DESC_HEALTH_DEF_SIZE		= 0x25,
+	/*
+	 * Max. 126 UNICODE characters (2 bytes per character) plus 2 bytes
+	 * of descriptor header.
+	 */
+	QUERY_DESC_STRING_DEF_SIZE		= 0xFE,
 };
 
 /* Unit descriptor parameters offsets in bytes*/
@@ -246,6 +262,7 @@ enum unit_desc_param {
 #if defined(CONFIG_SCSI_UFS_TW)
 	UNIT_DESC_TW_LU_MAX_BUF_SIZE			= 0x29,
 #endif
+	UNIT_DESC_PARAM_TW_BUF_ALLOC_UNIT		= 0x29,
 };
 
 /* Device descriptor parameters offsets in bytes*/
@@ -289,12 +306,12 @@ enum device_desc_param {
 	DEVICE_DESC_PARAM_HPB_VER		= 0x40,
 	DEVICE_DESC_PARAM_HPB_CONTROL		= 0x42, /* JEDEC version */
 #endif
-#if defined(CONFIG_SCSI_UFS_FEATURE)
 	DEVICE_DESC_PARAM_EX_FEAT_SUP		= 0x4F,
-#endif
 #if defined(CONFIG_SCSI_UFS_TW)
 	DEVICE_DESC_PARAM_TW_RETURN_TO_USER = 0x53,
+#endif
 	DEVICE_DESC_PARAM_TW_BUF_TYPE		= 0x54,
+#if defined(CONFIG_SCSI_UFS_TW)
 	DEVICE_DESC_PARAM_NUM_SHARED_WB_BUF_AU	= 0x55, /* JEDEC version */
 #endif
 };
@@ -405,7 +422,8 @@ enum power_desc_param_offset {
 
 /* Exception event mask values */
 enum {
-	MASK_EE_STATUS		= 0xFFFF,
+	/* disable tw event [bit 5] as default */
+	MASK_EE_STATUS		= 0xFFDF,
 	MASK_EE_URGENT_BKOPS	= (1 << 2),
 #if defined(CONFIG_SCSI_UFS_TW)
 	MASK_EE_TW		= (1 << 5),
@@ -635,6 +653,7 @@ struct ufs_dev_info {
 	u8 *model;
 	u16 wspecversion;
 	u32 clk_gating_wait_us;
+	u32 dextfeatsupport;
 };
 
 /**

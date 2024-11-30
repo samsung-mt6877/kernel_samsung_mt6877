@@ -275,8 +275,6 @@ static unsigned int g_log_def_constraint;
 #define ISP_REG_ADDR_CAMSV_FMT_SEL              (ISP_ADDR +     0x5004)
 #define ISP_REG_ADDR_CAMSV_INT                  (ISP_ADDR +     0x500C)
 #define ISP_REG_ADDR_CAMSV_SW_CTL               (ISP_ADDR +     0x5010)
-#define ISP_REG_ADDR_AFO_D_XSIZE                (ISP_ADDR +     0x3534)
-#define ISP_REG_ADDR_AFO_D_YSIZE                (ISP_ADDR +     0x353C)
 #define ISP_REG_ADDR_CAMSV_TG_INTER_ST          (ISP_ADDR +     0x544C)
 #define ISP_REG_ADDR_CAMSV2_FMT_SEL             (ISP_ADDR +     0x5804)
 #define ISP_REG_ADDR_CAMSV2_INT                 (ISP_ADDR +     0x580C)
@@ -362,8 +360,6 @@ static unsigned int g_log_def_constraint;
 #define ISP_INNER_REG_ADDR_RRZO_YSIZE           (ISP_ADDR_CAMINF + 0xF32C)
 #define ISP_INNER_REG_ADDR_RRZO_STRIDE          (ISP_ADDR_CAMINF + 0xF330)
 #define ISP_INNER_REG_ADDR_RRZO_CROP            (ISP_ADDR_CAMINF + 0xF33C)
-#define ISP_INNER_REG_ADDR_AFO_D_XSIZE          (ISP_ADDR_CAMINF + 0xF534)
-#define ISP_INNER_REG_ADDR_AFO_D_YSIZE          (ISP_ADDR_CAMINF + 0xF53C)
 #if (ISP_RAW_D_SUPPORT == 1)
 #define ISP_INNER_REG_ADDR_IMGO_D_XSIZE         (ISP_ADDR_CAMINF + 0xF4DC)
 #define ISP_INNER_REG_ADDR_IMGO_D_YSIZE         (ISP_ADDR_CAMINF + 0xF4E0)
@@ -4241,7 +4237,7 @@ static long ISP_REF_CNT_CTRL_FUNC(unsigned long Param)
 	/*      */
 	if (copy_from_user(&ref_cnt_ctrl, (void __user *)Param, sizeof(struct ISP_REF_CNT_CTRL_STRUCT)) ==
 	    0) {
-		if (ref_cnt_ctrl.id < ISP_REF_CNT_ID_MAX) {
+		if ((ref_cnt_ctrl.id < 0) || (ref_cnt_ctrl.id >= ISP_REF_CNT_ID_MAX)) {
 			LOG_PR_ERR("[rc] invalid ref_cnt_ctrl.id %d\n", ref_cnt_ctrl.id);
 			return -EFAULT;
 		}
@@ -4978,7 +4974,7 @@ static long ISP_Buf_CTRL_FUNC(unsigned long Param)
 	unsigned long p1_dma_addr_reg[_rt_dma_max_];
 	unsigned long flags; /* old: unsigned int flags;*//* FIX to avoid build warning */
 	struct ISP_RT_BUF_INFO_STRUCT rt_buf_info;
-	struct ISP_DEQUE_BUF_INFO_STRUCT deque_buf = {0};
+	struct ISP_DEQUE_BUF_INFO_STRUCT deque_buf;
 	enum eISPIrq irqT = _IRQ_MAX;
 	enum eISPIrq irqT_Lock = _IRQ_MAX;
 	bool CurVF_En = MFALSE;
@@ -8057,7 +8053,8 @@ static signed int ISP_MARK_IRQ(struct ISP_WAIT_IRQ_STRUCT irqinfo)
 			IRQ_USER_NUM_MAX);
 		return 0;
 	}
-	if (irqinfo.UserInfo.Type >= ISP_IRQ_TYPE_AMOUNT) {
+	if ((irqinfo.UserInfo.Type >= ISP_IRQ_TYPE_AMOUNT)
+		|| (irqinfo.UserInfo.Type < 0)) {
 		LOG_PR_ERR("invalid type(%d), max(%d)", irqinfo.UserInfo.Type,
 			ISP_IRQ_TYPE_AMOUNT);
 		return 0;
@@ -8078,7 +8075,8 @@ static signed int ISP_MARK_IRQ(struct ISP_WAIT_IRQ_STRUCT irqinfo)
 
 	spin_lock_irqsave(&(IspInfo.SpinLockIrq[eIrq]), flags);
 	if ((irqinfo.UserInfo.UserKey < 0) || (irqinfo.UserInfo.UserKey >= IRQ_USER_NUM_MAX) ||
-		(irqinfo.UserInfo.Type >= ISP_IRQ_TYPE_AMOUNT) ||(idx < 0) || (idx >= 32)) {
+		(irqinfo.UserInfo.Type < 0) || (irqinfo.UserInfo.Type >= ISP_IRQ_TYPE_AMOUNT) ||
+		(idx < 0) || (idx >= 32)) {
 		LOG_DBG("Error: Invalid Index");
 		return 0;
 	}
@@ -8147,7 +8145,8 @@ static signed int ISP_GET_MARKtoQEURY_TIME(struct ISP_WAIT_IRQ_STRUCT *irqinfo)
 		Ret = -EFAULT;
 		return Ret;
 	}
-	if (irqinfo->UserInfo.Type >= ISP_IRQ_TYPE_AMOUNT) {
+	if ((irqinfo->UserInfo.Type >= ISP_IRQ_TYPE_AMOUNT)
+		|| (irqinfo->UserInfo.Type < 0)) {
 		LOG_PR_ERR("invalid type(%d), max(%d)", irqinfo->UserInfo.Type,
 			ISP_IRQ_TYPE_AMOUNT);
 		Ret = -EFAULT;
@@ -8299,7 +8298,8 @@ static signed int ISP_FLUSH_IRQ_V3(struct ISP_WAIT_IRQ_STRUCT irqinfo)
 			irqinfo.UserInfo.UserKey, IRQ_USER_NUM_MAX);
 		return 0;
 	}
-	if (irqinfo.UserInfo.Type >= ISP_IRQ_TYPE_AMOUNT) {
+	if ((irqinfo.UserInfo.Type >= ISP_IRQ_TYPE_AMOUNT)
+		|| (irqinfo.UserInfo.Type < 0)) {
 		LOG_PR_ERR("invalid type(%d), max(%d)\n",
 			irqinfo.UserInfo.Type, ISP_IRQ_TYPE_AMOUNT);
 		return 0;
@@ -8475,7 +8475,7 @@ static signed int ISP_WaitIrq(struct ISP_WAIT_IRQ_STRUCT *WaitIrq)
 				gEismetaRIdx_D = (gEismetaWIdx_D - gEismetaInSOF_D - 1);
 			}
 
-			if (gEismetaRIdx_D >= EISMETA_RINGSIZE) {
+			if ((gEismetaRIdx_D < 0) || (gEismetaRIdx_D >= EISMETA_RINGSIZE)) {
 				/* BUG_ON(1); */
 				gEismetaRIdx_D = 0;
 				/* TBD WARNING */
@@ -8588,7 +8588,8 @@ static signed int ISP_WaitIrq_v3(struct ISP_WAIT_IRQ_STRUCT *WaitIrq)
 			WaitIrq->UserInfo.UserKey, IRQ_USER_NUM_MAX);
 		return 0;
 	}
-	if (WaitIrq->UserInfo.Type >= ISP_IRQ_TYPE_AMOUNT) {
+	if ((WaitIrq->UserInfo.Type >= ISP_IRQ_TYPE_AMOUNT)
+		|| (WaitIrq->UserInfo.Type < 0)) {
 		LOG_PR_ERR("invalid type(%d), max(%d)\n",
 			WaitIrq->UserInfo.Type, ISP_IRQ_TYPE_AMOUNT);
 		return 0;
@@ -8738,7 +8739,7 @@ static signed int ISP_WaitIrq_v3(struct ISP_WAIT_IRQ_STRUCT *WaitIrq)
 				gEismetaRIdx = (gEismetaWIdx - gEismetaInSOF - 1);
 			}
 
-			if (gEismetaRIdx >= EISMETA_RINGSIZE) {
+			if ((gEismetaRIdx < 0) || (gEismetaRIdx >= EISMETA_RINGSIZE)) {
 				/* BUG_ON(1); */
 				gEismetaRIdx = 0;
 				/* TBD WARNING */
@@ -8767,7 +8768,7 @@ static signed int ISP_WaitIrq_v3(struct ISP_WAIT_IRQ_STRUCT *WaitIrq)
 				gEismetaRIdx_D = (gEismetaWIdx_D - gEismetaInSOF_D - 1);
 			}
 
-			if (gEismetaRIdx_D >= EISMETA_RINGSIZE) {
+			if ((gEismetaRIdx_D < 0) || (gEismetaRIdx_D >= EISMETA_RINGSIZE)) {
 				/* BUG_ON(1); */
 				gEismetaRIdx_D = 0;
 				/* TBD WARNING */
@@ -9791,7 +9792,7 @@ static __tcmfunc irqreturn_t ISP_Irq_CAM(signed int Irq, void *DeviceId)
 			_fbc_chk[0].Reg_val = ISP_RD32(ISP_REG_ADDR_IMGO_FBC);
 			_fbc_chk[1].Reg_val = ISP_RD32(ISP_REG_ADDR_RRZO_FBC);
 			IRQ_LOG_KEEPER(_IRQ, m_CurrentPPB, _LOG_INF,
-				       "P1_SOF_%d_%d(0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x)\n",
+				       "P1_SOF_%d_%d(0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x)\n",
 				       sof_count[_PASS1], cur_v_cnt,
 				       (unsigned int)(_fbc_chk[0].Reg_val),
 				       (unsigned int)(_fbc_chk[1].Reg_val),
@@ -9799,10 +9800,6 @@ static __tcmfunc irqreturn_t ISP_Irq_CAM(signed int Irq, void *DeviceId)
 				       ISP_RD32(ISP_REG_ADDR_RRZO_BASE_ADDR),
 				       ISP_RD32(ISP_INNER_REG_ADDR_IMGO_YSIZE),
 				       ISP_RD32(ISP_INNER_REG_ADDR_RRZO_YSIZE),
-				       ISP_RD32(ISP_REG_ADDR_AFO_D_XSIZE),
-				       ISP_RD32(ISP_REG_ADDR_AFO_D_YSIZE),
-				       ISP_RD32(ISP_INNER_REG_ADDR_AFO_D_XSIZE),
-				       ISP_RD32(ISP_INNER_REG_ADDR_AFO_D_YSIZE),
 				       ISP_RD32(ISP_REG_ADDR_TG_MAGIC_0));
 			/* 1 port is enough     */
 			if (pstRTBuf->ring_buf[_imgo_].active) {

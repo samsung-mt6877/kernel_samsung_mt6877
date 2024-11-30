@@ -23,8 +23,16 @@
 #ifdef CONFIG_MTK_MUSB_PHY
 #include <usb20_phy.h>
 #endif
+#if defined(CONFIG_CABLE_TYPE_NOTIFIER)
+#include <linux/cable_type_notifier.h>
+#endif
 
 #include <mt-plat/mtk_boot_common.h>
+#if defined(CONFIG_BATTERY_SAMSUNG)
+#include "../../../../battery/common/sec_charging_common.h"
+#endif
+
+#include <linux/usb_notify.h>
 
 MODULE_LICENSE("GPL v2");
 
@@ -92,6 +100,59 @@ static DEFINE_SPINLOCK(usb_hal_dpidle_lock);
 #define DPIDLE_TIMER_INTERVAL_MS 30
 
 static void issue_dpidle_timer(void);
+
+#if defined(CONFIG_BATTERY_SAMSUNG)
+static int musb_set_vbus_current(int usb_state)
+{
+        struct power_supply *psy;
+        union power_supply_propval pval = {0};
+        int cur = 100;
+
+        if (usb_state == USB_CONFIGURED)
+                cur = USB_CURRENT_HIGH_SPEED;
+        else
+                cur = USB_CURRENT_UNCONFIGURED;
+
+        pr_info("%s : %dmA\n", __func__, cur);
+
+        psy = power_supply_get_by_name("battery");
+        if (psy) {
+                pval.intval = cur;
+                psy_do_property("battery", set,
+                        POWER_SUPPLY_EXT_PROP_USB_CONFIGURE, pval);
+                power_supply_put(psy);
+        }
+
+        return 0;
+}
+
+static void musb_set_vbus_current_work(struct work_struct *w)
+{
+        struct musb *musb = container_of(w,
+                struct musb, set_vbus_current_work);
+        struct otg_notify *o_notify = get_otg_notify();
+
+        switch (musb->usb_state) {
+        case USB_SUSPEND:
+        /* set vbus current for suspend state is called in usb_notify. */
+                send_otg_notify(o_notify, NOTIFY_EVENT_USBD_SUSPENDED, 1);
+                goto skip;
+        case USB_UNCONFIGURED:
+                send_otg_notify(o_notify, NOTIFY_EVENT_USBD_UNCONFIGURED, 1);
+                break;
+        case USB_CONFIGURED:
+                send_otg_notify(o_notify, NOTIFY_EVENT_USBD_CONFIGURED, 1);
+                break;
+        default:
+                break;
+        }
+
+        musb_set_vbus_current(musb->usb_state);
+
+skip:
+        return;
+}
+#endif
 
 static void dpidle_timer_wakeup_func(struct timer_list *timer)
 {
@@ -205,8 +266,9 @@ void Charger_Detect_Init(void)
 	/* wait 50 usec. */
 	udelay(50);
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	phy_set_mode_ext(glue->phy, PHY_MODE_USB_DEVICE, PHY_MODE_BC11_SW_SET);
-
+#endif
 	usb_prepare_enable_clock(false);
 
 	DBG(0, "%s\n", __func__);
@@ -217,7 +279,9 @@ void Charger_Detect_Release(void)
 {
 	usb_prepare_enable_clock(true);
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	phy_set_mode_ext(glue->phy, PHY_MODE_USB_DEVICE, PHY_MODE_BC11_SW_CLR);
+#endif
 
 	udelay(1);
 
@@ -870,6 +934,22 @@ static bool musb_hal_is_vbus_exist(void)
 	return vbus_exist;
 }
 
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+bool usb_cable_connected(void)
+{
+	struct otg_notify *usb_notify;
+	int usb_mode = 0;
+
+	usb_notify = get_otg_notify();
+	usb_mode = get_usb_mode(usb_notify);
+	printk("usb: %s: %d\n", __func__, usb_mode);
+	if (usb_mode == NOTIFY_PERIPHERAL_MODE)
+		return true;
+	else
+		return false;
+
+}
+#else
 /* be aware this could not be used in non-sleep context */
 bool usb_cable_connected(struct musb *musb)
 {
@@ -878,6 +958,7 @@ bool usb_cable_connected(struct musb *musb)
 	else
 		return false;
 }
+#endif
 
 static bool cmode_effect_on(void)
 {
@@ -893,37 +974,10 @@ static bool cmode_effect_on(void)
 	return effect;
 }
 
-static void set_usb_phy_mode(int mode)
-{
-	switch (mode) {
-	case PHY_MODE_USB_DEVICE:
-	/* VBUSVALID=1, AVALID=1, BVALID=1, SESSEND=0, IDDIG=1, IDPULLUP=1 */
-		USBPHY_CLR32(0x6C, (0x10<<0));
-		USBPHY_SET32(0x6C, (0x2F<<0));
-		USBPHY_SET32(0x6C, (0x3F<<8));
-		break;
-	case PHY_MODE_USB_HOST:
-	/* VBUSVALID=1, AVALID=1, BVALID=1, SESSEND=0, IDDIG=0, IDPULLUP=1 */
-		USBPHY_CLR32(0x6c, (0x12<<0));
-		USBPHY_SET32(0x6c, (0x2d<<0));
-		USBPHY_SET32(0x6c, (0x3f<<8));
-		break;
-	case PHY_MODE_INVALID:
-	/* VBUSVALID=0, AVALID=0, BVALID=0, SESSEND=1, IDDIG=0, IDPULLUP=1 */
-		USBPHY_SET32(0x6c, (0x11<<0));
-		USBPHY_CLR32(0x6c, (0x2e<<0));
-		USBPHY_SET32(0x6c, (0x3f<<8));
-		break;
-	default:
-		DBG(0, "mode error %d\n", mode);
-	}
-	DBG(0, "force PHY to mode %d, 0x6c=%x\n", mode, USBPHY_READ32(0x6c));
-}
-
 void do_connection_work(struct work_struct *data)
 {
 	unsigned long flags = 0;
-	int usb_clk_state = NO_CHANGE;
+	int usb_clk_state = NO_CHANGE, phy_mode = -1;
 	bool usb_on, usb_connected;
 	struct mt_usb_work *work =
 		container_of(data, struct mt_usb_work, dwork.work);
@@ -935,15 +989,34 @@ void do_connection_work(struct work_struct *data)
 	/* clk_prepare_cnt +1 here*/
 	usb_prepare_clock(true);
 
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+	usb_connected = usb_cable_connected();
+#else
 	/* be aware this could not be used in non-sleep context */
 	usb_connected = mtk_musb->usb_connected;
+#endif
 
 	/* additional check operation here */
 	if (musb_force_on)
 		usb_on = true;
-	else if (work->ops == CONNECTION_OPS_CHECK)
+	else if (work->ops == CONNECTION_OPS_CHECK) {
 		usb_on = usb_connected;
-	else
+#if defined(CONFIG_CABLE_TYPE_NOTIFIER)
+		if (!musb_is_host() && usb_on) {
+			DBG(0, "mtk_musb->sec_cable_type=%d", mtk_musb->sec_cable_type);
+			switch (mtk_musb->sec_cable_type) {
+				case POWER_SUPPLY_USB_TYPE_SDP:
+					cable_type_notifier_set_attached_dev(CABLE_TYPE_USB_SDP);
+					break;
+				case POWER_SUPPLY_USB_TYPE_CDP:
+					cable_type_notifier_set_attached_dev(CABLE_TYPE_USB_CDP);
+					break;
+				default:
+					break;
+			}
+		}
+#endif
+	} else
 		usb_on = (work->ops ==
 			CONNECTION_OPS_CONN ? true : false);
 
@@ -976,11 +1049,9 @@ void do_connection_work(struct work_struct *data)
 		/* note this already put SOFTCON */
 		musb_start(mtk_musb);
 		usb_clk_state = OFF_TO_ON;
-
-		/* Set USB phy mode here. */
-		set_usb_phy_mode(PHY_MODE_USB_DEVICE);
-
+		phy_mode = PHY_MODE_USB_DEVICE;
 	} else if (mtk_musb->power && (usb_on == false)) {
+		phy_mode = PHY_MODE_INVALID;
 		/* disable usb */
 		musb_stop(mtk_musb);
 		if (mtk_musb->usb_lock->active) {
@@ -995,6 +1066,13 @@ void do_connection_work(struct work_struct *data)
 				usb_on, mtk_musb->power);
 exit:
 	spin_unlock_irqrestore(&mtk_musb->lock, flags);
+#ifdef CONFIG_PHY_MTK_TPHY
+	/* set PHY mode after spinlock released */
+	if(phy_mode == PHY_MODE_USB_DEVICE)
+		phy_set_mode(glue->phy, PHY_MODE_USB_DEVICE);
+	else if (phy_mode == PHY_MODE_INVALID)
+		phy_set_mode(glue->phy, PHY_MODE_INVALID);
+#endif
 
 	if (usb_clk_state == ON_TO_OFF) {
 		/* clock on -> of: clk_prepare_cnt -2 */
@@ -1148,6 +1226,10 @@ EXPORT_SYMBOL(musb_platform_reset);
 void musb_sync_with_bat(struct musb *musb, int usb_state)
 {
 	DBG(1, "BATTERY_SetUSBState, state=%d\n", usb_state);
+#if defined(CONFIG_BATTERY_SAMSUNG)
+        musb->usb_state = usb_state;
+        schedule_work(&musb->set_vbus_current_work);
+#endif
 }
 EXPORT_SYMBOL(musb_sync_with_bat);
 
@@ -1810,8 +1892,10 @@ static int __init mt_usb_init(struct musb *musb)
 
 	DBG(1, "%s\n", __func__);
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	musb->phy = glue->phy;
 	musb->xceiv = glue->xceiv;
+#endif
 	musb->dma_irq = (int)SHARE_IRQ;
 	musb->fifo_cfg = fifo_cfg;
 	musb->fifo_cfg_size = ARRAY_SIZE(fifo_cfg);
@@ -1821,9 +1905,11 @@ static int __init mt_usb_init(struct musb *musb)
 	musb->fifo_size = 8 * 1024;
 	musb->usb_lock = wakeup_source_register(NULL, "USB suspend lock");
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	ret = phy_init(glue->phy);
 	if (ret)
 		goto err_phy_init;
+#endif
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH
 	in_uart_mode = usb_phy_check_in_uart_mode();
@@ -1832,6 +1918,8 @@ static int __init mt_usb_init(struct musb *musb)
 		DBG(0, "At UART mode. Switch to USB is not support\n");
 	}
 #endif
+
+#ifdef CONFIG_PHY_MTK_TPHY
 	phy_set_mode(glue->phy, glue->phy_mode);
 
 	if (glue->phy_mode != PHY_MODE_UART)
@@ -1839,7 +1927,7 @@ static int __init mt_usb_init(struct musb *musb)
 
 	if (ret)
 		goto err_phy_power_on;
-
+#endif
 #ifndef FPGA_PLATFORM
 	reg_vusb = regulator_get(musb->controller, "vusb");
 	if (!IS_ERR(reg_vusb)) {
@@ -1906,11 +1994,18 @@ static int __init mt_usb_init(struct musb *musb)
 #if defined(CONFIG_MTK_BASE_POWER)
 	timer_setup(&musb->idle_timer, musb_do_idle, 0);
 #endif
+#if defined(CONFIG_BATTERY_SAMSUNG)
+        INIT_WORK(&musb->set_vbus_current_work, musb_set_vbus_current_work);
+#endif
 #ifdef CONFIG_USB_MTK_OTG
 	mt_usb_otg_init(musb);
 	/* enable host suspend mode */
 	mt_usb_wakeup_init(musb);
+#ifdef CONFIG_USB_HOST_SAMSUNG_FEATURE
+	musb->host_suspend = false;
+#else
 	musb->host_suspend = true;
+#endif
 #endif
 #ifdef CONFIG_MACH_MT6761
 	/* only for mt6761 */
@@ -1919,10 +2014,11 @@ static int __init mt_usb_init(struct musb *musb)
 
 	return 0;
 
+#ifdef CONFIG_PHY_MTK_TPHY
 err_phy_power_on:
 	phy_exit(glue->phy);
 err_phy_init:
-
+#endif
 	return ret;
 }
 
@@ -1944,8 +2040,11 @@ static int mt_usb_exit(struct musb *musb)
 #ifdef CONFIG_USB_MTK_OTG
 	mt_usb_otg_exit(musb);
 #endif
+
+#ifdef CONFIG_PHY_MTK_TPHY
 	phy_power_off(glue->phy);
 	phy_exit(glue->phy);
+#endif
 
 	return 0;
 }
@@ -2024,6 +2123,7 @@ static int mt_usb_probe(struct platform_device *pdev)
 		goto err1;
 	}
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	glue->phy = devm_of_phy_get_by_index(&pdev->dev, np, 0);
 	if (IS_ERR(glue->phy)) {
 		dev_err(&pdev->dev, "fail to getting phy %ld\n",
@@ -2043,7 +2143,7 @@ static int mt_usb_probe(struct platform_device *pdev)
 		ret = PTR_ERR(glue->xceiv);
 		goto err_unregister_usb_phy;
 	}
-
+#endif
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
 		dev_notice(&pdev->dev, "failed to allocate musb platform data\n");
@@ -2163,6 +2263,7 @@ static int mt_usb_probe(struct platform_device *pdev)
 	of_property_read_u32(np, "dr_mode", (u32 *) &pdata->dr_mode);
 #endif
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	switch (pdata->dr_mode) {
 	case USB_DR_MODE_HOST:
 		glue->phy_mode = PHY_MODE_USB_HOST;
@@ -2179,11 +2280,12 @@ static int mt_usb_probe(struct platform_device *pdev)
 	}
 
 	DBG(0, "get dr_mode: %d\n", pdata->dr_mode);
+#endif
 
+#ifdef CONFIG_MTK_MUSB_DUAL_ROLE
 	/* assign usb-role-sw */
 	otg_sx = &glue->otg_sx;
 
-#ifdef CONFIG_MTK_MUSB_DUAL_ROLE
 	otg_sx->manual_drd_enabled =
 		of_property_read_bool(np, "enable-manual-drd");
 	otg_sx->role_sw_used = of_property_read_bool(np, "usb-role-switch");
@@ -2221,8 +2323,10 @@ static int mt_usb_probe(struct platform_device *pdev)
 err2:
 	platform_device_put(musb_pdev);
 	platform_device_unregister(glue->musb_pdev);
+#ifdef CONFIG_PHY_MTK_TPHY
 err_unregister_usb_phy:
 	usb_phy_generic_unregister(glue->usb_phy);
+#endif
 err1:
 	kfree(glue);
 err0:
@@ -2232,10 +2336,13 @@ err0:
 static int mt_usb_remove(struct platform_device *pdev)
 {
 	struct mt_usb_glue *glue = platform_get_drvdata(pdev);
+#ifdef CONFIG_PHY_MTK_TPHY
 	struct platform_device *usb_phy = glue->usb_phy;
-
+#endif
 	platform_device_unregister(glue->musb_pdev);
+#ifdef CONFIG_PHY_MTK_TPHY
 	usb_phy_generic_unregister(usb_phy);
+#endif
 	kfree(glue);
 
 	return 0;

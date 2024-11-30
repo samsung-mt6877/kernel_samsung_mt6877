@@ -24,6 +24,9 @@ struct LCM_DRIVER *lcm_driver_list[] = {
 #if defined(HX83102P_WXGA_VDO_INCELL_BOE)
 	&hx83102p_wxga_vdo_incell_boe_lcm_drv,
 #endif
+#if defined(CONFIG_SMCDSD_PANEL)
+	&smcdsd_panel_drv,
+#endif
 #if defined(NT36672AH_HDP_DSI_VDO_TCL_CSOT)
 	&nt36672ah_hdp_dsi_vdo_tcl_csot_lcm_drv,
 #endif
@@ -38,18 +41,6 @@ struct LCM_DRIVER *lcm_driver_list[] = {
 #endif
 #if defined(OTM1285A_HD720_DSI_VDO_TM)
 	&otm1285a_hd720_dsi_vdo_tm_lcm_drv,
-#endif
-
-#if defined(OTM1901A_FHD_DSI_VDO_TPV)
-	&otm1901a_fhd_dsi_vdo_tpv_lcm_drv,
-#endif
-
-#if defined(R63350A_FHD_DSI_VDO_TRULY)
-	&r63350a_fhd_dsi_vdo_truly_lcm_drv,
-#endif
-
-#if defined(NT35532_FHD_DSI_VDO_SHARP)
-	&nt35532_fhd_dsi_vdo_sharp_lcm_drv,
 #endif
 
 #if defined(NT35595_FHD_DSI_CMD_TRULY_8163)
@@ -1255,22 +1246,6 @@ struct LCM_DRIVER *lcm_driver_list[] = {
 	&td4320_fhdp_dsi_vdo_auo_rt5081_lcm_drv,
 #endif
 
-#if defined(TD4320_FHDP_DSI_VDO_AUO_RT4801)
-	&td4320_fhdp_dsi_vdo_auo_rt4801_lcm_drv,
-#endif
-
-#if defined(NT36672C_FHDP_DSI_VDO_AUO_CPHY_90HZ_JDI)
-	&nt36672c_fhdp_dsi_vdo_auo_cphy_90hz_jdi_lcm_drv,
-#endif
-
-#if defined(NT36672C_FHDP_DSI_VDO_120HZ_SHENCHAO_6382)
-	&nt36672c_fhdp_dsi_vdo_120hz_shenchao_6382_lcm_drv,
-#endif
-
-#if defined(R66451_FHDP_DSI_CMD_TIANMA)
-	&r66451_fhdp_dsi_cmd_tianma_lcm_drv,
-#endif
-
 /*6768 OTM*/
 #if defined(OTM1911A_FHDP_DSI_VDO_TRULY_RT5081)
 	&otm1911a_fhdp_dsi_vdo_truly_rt5081_lcm_drv,
@@ -1282,6 +1257,30 @@ struct LCM_DRIVER *lcm_driver_list[] = {
 
 #if defined(OTM1911A_FHDP_DSI_VDO_TRULY_RT4801)
 	&otm1911a_fhdp_dsi_vdo_truly_rt4801_lcm_drv,
+#endif
+
+#if defined(TD4150_HDP_DSI_LM36274)
+	&td4150_hdp_dsi_lm36274_lcm_drv,
+#endif
+
+#if defined(TD4150_HDP_DSI_LM36274_A12)
+	&td4150_hdp_dsi_lm36274_lcm_a12_drv,
+#endif
+
+#if defined(ILI9882N_HDP_DSI_VDO_ILITEK_LM36274)
+	&ili9882n_hdp_dsi_vdo_ilitek_lm36274_lcm_drv,
+#endif
+
+#if defined(S6E3FC3_FHDP_CMD)
+	&s6e3fc3_fhdp_cmd_lcm_drv,
+#endif
+
+#if defined(S6E3FC3_FHDP_CMD_A22_LTE)
+	&s6e3fc3_fhdp_cmd_a22_lte_lcm_drv,
+#endif
+
+#if defined(S6E3FC3_HDP_CMD_A22_LTE)
+	&s6e3fc3_hdp_cmd_a22_lte_lcm_drv,
 #endif
 };
 

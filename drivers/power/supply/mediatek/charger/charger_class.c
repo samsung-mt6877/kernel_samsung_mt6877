@@ -179,6 +179,18 @@ int charger_dev_get_vbus(struct charger_device *chg_dev, u32 *vbus)
 }
 EXPORT_SYMBOL(charger_dev_get_vbus);
 
+#if defined(CONFIG_USB_FACTORY_MODE)
+int charger_dev_get_vsys(struct charger_device *chg_dev, u32 *vsys)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->get_vsys_adc)
+		return chg_dev->ops->get_vsys_adc(chg_dev, vsys);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_get_vsys);
+#endif
+
 int charger_dev_get_ibus(struct charger_device *chg_dev, u32 *ibus)
 {
 	if (chg_dev != NULL && chg_dev->ops != NULL &&
@@ -377,6 +389,49 @@ int charger_dev_enable_hz(struct charger_device *chg_dev, bool en)
 	return -ENOTSUPP;
 }
 EXPORT_SYMBOL(charger_dev_enable_hz);
+
+#if defined(CONFIG_USB_FACTORY_MODE)
+int charger_dev_enable_aicc(struct charger_device *chg_dev, bool en)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->enable_aicc)
+		return chg_dev->ops->enable_aicc(chg_dev, en);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_enable_aicc);
+
+int charger_dev_en_wdt(struct charger_device *chg_dev, bool en)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->en_wdt)
+		return chg_dev->ops->en_wdt(chg_dev, en);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_en_wdt);
+
+int charger_dev_set_iinlmtsel(struct charger_device *chg_dev,
+	 bool en)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->set_iinlmtsel)
+		return chg_dev->ops->set_iinlmtsel(chg_dev, en);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_set_iinlmtsel);
+
+int charger_dev_en_ilim(struct charger_device *chg_dev, bool en)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->en_ilim)
+		return chg_dev->ops->en_ilim(chg_dev, en);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_en_ilim);
+#endif
 
 int charger_dev_get_adc(struct charger_device *charger_dev,
 	enum adc_channel chan, int *min, int *max)
@@ -646,6 +701,28 @@ int charger_dev_enable_discharge(struct charger_device *chg_dev, bool en)
 }
 EXPORT_SYMBOL(charger_dev_enable_discharge);
 
+#if defined(CONFIG_USB_FACTORY_MODE)
+int charger_dev_enable_eoc(struct charger_device *chg_dev, bool en)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->enable_eoc)
+		return chg_dev->ops->enable_eoc(chg_dev, en);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_enable_eoc);
+
+int charger_dev_set_eoc_timer(struct charger_device *chg_dev, unsigned int time)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->set_eoc_timer)
+		return chg_dev->ops->set_eoc_timer(chg_dev, time);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_set_eoc_timer);
+#endif
+
 int charger_dev_set_boost_current_limit(struct charger_device *chg_dev, u32 uA)
 {
 	if (chg_dev != NULL && chg_dev->ops != NULL &&
@@ -683,6 +760,18 @@ int charger_dev_reset_eoc_state(struct charger_device *chg_dev)
 	return -ENOTSUPP;
 }
 EXPORT_SYMBOL(charger_dev_reset_eoc_state);
+
+#if defined(CONFIG_USB_FACTORY_MODE)
+int charger_dev_enable_ship_mode(struct charger_device *chg_dev, bool battfet)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->enable_ship_mode)
+		return chg_dev->ops->enable_ship_mode(chg_dev, battfet);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_enable_ship_mode);
+#endif
 
 int charger_dev_safety_check(struct charger_device *chg_dev, u32 polling_ieoc)
 {
@@ -787,6 +876,39 @@ int charger_dev_enable_bleed_discharge(struct charger_device *charger_dev,
 	return -ENOTSUPP;
 }
 EXPORT_SYMBOL(charger_dev_enable_bleed_discharge);
+
+#if defined(CONFIG_USB_FACTORY_MODE)
+int charger_dev_get_health(struct charger_device *chg_dev, int *health)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL && chg_dev->ops->get_health)
+		return chg_dev->ops->get_health(chg_dev, health);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_get_health);
+
+int charger_dev_get_charge_type(struct charger_device *chg_dev, int *type)
+{
+	if (chg_dev != NULL && chg_dev->ops != NULL &&
+	    chg_dev->ops->get_charge_type)
+		return chg_dev->ops->get_charge_type(chg_dev, type);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_get_charge_type);
+
+int charger_dev_get_charging_status(struct charger_device *charger_dev,
+				       u32 *charging_status)
+{
+	if (charger_dev != NULL && charger_dev->ops != NULL &&
+				       charger_dev->ops->get_charging_status)
+		return charger_dev->ops->get_charging_status(charger_dev,
+								charging_status);
+
+	return -ENOTSUPP;
+}
+EXPORT_SYMBOL(charger_dev_get_charging_status);
+#endif
 
 static DEVICE_ATTR(name, 0444, charger_show_name, NULL);
 

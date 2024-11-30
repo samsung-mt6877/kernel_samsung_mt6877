@@ -92,6 +92,7 @@
 #include "disp_partial.h"
 #include "ddp_aal.h"
 #include "ddp_gamma.h"
+#include "mtk_notify.h"
 
 #define MMSYS_CLK_LOW (0)
 #define MMSYS_CLK_HIGH (1)
@@ -167,6 +168,9 @@ DECLARE_WAIT_QUEUE_HEAD(decouple_trigger_wq);
 wait_queue_head_t primary_display_present_fence_wq;
 atomic_t primary_display_pt_fence_update_event = ATOMIC_INIT(0);
 static unsigned int _need_lfr_check(void);
+
+struct mtk_uevent_dev uevent_data;
+EXPORT_SYMBOL(uevent_data);
 
 #ifdef CONFIG_MTK_DISPLAY_120HZ_SUPPORT
 static int od_need_start;
@@ -3685,6 +3689,9 @@ int primary_display_init(char *lcm_name, unsigned int lcm_fps,
 	ret = switch_dev_register(&disp_switch_data);
 #endif
 
+	uevent_data.name = "lcm_disconnect";
+	uevent_dev_register(&uevent_data);
+
 	DISPCHECK("%s: done\n", __func__);
 done:
 	if (disp_helper_get_stage() != DISP_HELPER_STAGE_NORMAL)
@@ -4123,6 +4130,9 @@ int primary_display_suspend(void)
 {
 	enum DISP_STATUS ret = DISP_STATUS_OK;
 
+#if defined(CONFIG_MTK_VSYNC_PRINT)
+	disp_unregister_irq_callback(vsync_print_handler);
+#endif
 	DISPCHECK("%s begin\n", __func__);
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_suspend,
 			 MMPROFILE_FLAG_START, 0, 0);
@@ -4678,6 +4688,9 @@ done:
 	DISPMSG("skip_update:%d\n", skip_update);
 
 	//aee_kernel_wdt_kick_Powkey_api("mtkfb_late_resume", WDT_SETBY_Display);
+#if defined(CONFIG_MTK_VSYNC_PRINT)
+	disp_register_irq_callback(vsync_print_handler);
+#endif
 	mmprofile_log_ex(ddp_mmp_get_events()->primary_resume,
 			 MMPROFILE_FLAG_END, 0, 0);
 	return ret;

@@ -30,6 +30,7 @@
 #include <linux/time.h>
 #include <linux/uaccess.h>
 #include <linux/reboot.h>
+#include <linux/usb_notify.h>
 
 #include <linux/of.h>
 #include <linux/extcon.h>
@@ -42,8 +43,26 @@
 #include <mt-plat/v1/mtk_charger.h>
 #include <pmic.h>
 #include <tcpm.h>
+#include <tcpci_core.h>
 
 #include "mtk_charger_intf.h"
+#ifdef CONFIG_MT6360_PMU_CHARGER
+extern bool mt6360_get_is_host(void);
+#endif
+
+#if defined(CONFIG_AFC_CHARGER)
+#include <mt-plat/afc_charger.h>
+#endif
+
+#ifdef CONFIG_BATTERY_SAMSUNG
+#ifdef CONFIG_PDIC_NOTIFIER
+#include <linux/usb/typec/common/pdic_notifier.h>
+#endif
+#include <../drivers/battery/common/sec_charging_common.h>
+#include <linux/battery/sec_pd.h>
+
+extern struct pdic_notifier_struct pd_noti;
+#endif
 
 struct tag_bootmode {
 	u32 size;
@@ -93,6 +112,9 @@ struct chg_type_info {
 	bool ignore_usb;
 	bool plugin;
 	bool bypass_chgdet;
+#ifdef CONFIG_MTK_TYPEC_WATER_DETECT
+	bool water_detected;
+#endif
 #ifdef CONFIG_MACH_MT6771
 	struct power_supply *chr_psy;
 	struct notifier_block psy_nb;
@@ -115,10 +137,12 @@ static const char * const mtk_chg_type_name[] = {
 	"Charging USB Host",
 	"Non-standard Charger",
 	"Standard Charger",
+	"Apple 2.4A Charger",
 	"Apple 2.1A Charger",
 	"Apple 1.0A Charger",
 	"Apple 0.5A Charger",
 	"Wireless Charger",
+	"Samsung Charger",
 };
 
 static void dump_charger_name(enum charger_type type)
@@ -129,9 +153,11 @@ static void dump_charger_name(enum charger_type type)
 	case CHARGING_HOST:
 	case NONSTANDARD_CHARGER:
 	case STANDARD_CHARGER:
+	case APPLE_2_4A_CHARGER:
 	case APPLE_2_1A_CHARGER:
 	case APPLE_1_0A_CHARGER:
 	case APPLE_0_5A_CHARGER:
+	case SAMSUNG_CHARGER:
 		pr_info("%s: charger type: %d, %s\n", __func__, type,
 			mtk_chg_type_name[type]);
 		break;
@@ -165,11 +191,17 @@ struct mt_charger {
 
 static int mt_charger_online(struct mt_charger *mtk_chg)
 {
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	return 0;
+#else
 	int ret = 0;
 	struct device *dev = NULL;
 	struct device_node *boot_node = NULL;
 	struct tag_bootmode *tag = NULL;
 	int boot_mode = 11;//UNKNOWN_BOOT
+#ifdef CONFIG_KPOC_GET_SOURCE_CAP_TRY
+	struct chg_type_info *cti = mtk_chg->cti;
+#endif
 	dev = mtk_chg->dev;
 	if (dev != NULL){
 		boot_node = of_parse_phandle(dev->of_node, "bootmode", 0);
@@ -193,14 +225,23 @@ static int mt_charger_online(struct mt_charger *mtk_chg)
 		if (boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT ||
 		    boot_mode == LOW_POWER_OFF_CHARGING_BOOT) {
 			pr_notice("%s: Unplug Charger/USB\n", __func__);
-			pr_notice("%s: system_state=%d\n", __func__,
-				system_state);
-			if (system_state != SYSTEM_POWER_OFF)
-				kernel_power_off();
+#ifdef CONFIG_KPOC_GET_SOURCE_CAP_TRY
+			pr_info("%s error_recovery_once = %d\n", __func__,
+				cti->tcpc->pd_port.error_recovery_once);
+			if (cti->tcpc->pd_port.error_recovery_once != 1) {
+#endif /*CONFIG_KPOC_GET_SOURCE_CAP_TRY*/
+				pr_notice("%s: system_state=%d\n", __func__,
+					system_state);
+				if (system_state != SYSTEM_POWER_OFF)
+					kernel_power_off();
+#ifdef CONFIG_KPOC_GET_SOURCE_CAP_TRY
+			}
+#endif
 		}
 	}
 
 	return ret;
+#endif
 }
 
 /* Power Supply Functions */
@@ -270,10 +311,19 @@ static int mt_charger_set_property(struct power_supply *psy,
 	enum power_supply_property psp, const union power_supply_propval *val)
 {
 	struct mt_charger *mtk_chg = power_supply_get_drvdata(psy);
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	int ret = 0;
+	int cable_type = 0;
+	union power_supply_propval propval = {0, };
+#if defined(CONFIG_PDIC_NOTIFIER)
+	union power_supply_propval value;
+#endif
+#endif
 	struct chg_type_info *cti = NULL;
 	#ifdef CONFIG_EXTCON_USB_CHG
 	struct usb_extcon_info *info;
 	#endif
+	bool is_host = 0;
 
 	pr_info("%s\n", __func__);
 
@@ -294,12 +344,14 @@ static int mt_charger_set_property(struct power_supply *psy,
 		return 0;
 	case POWER_SUPPLY_PROP_CHARGE_TYPE:
 		mtk_chg->chg_type = val->intval;
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 		if (mtk_chg->chg_type != CHARGER_UNKNOWN)
 			charger_manager_force_disable_power_path(
 				cti->chg_consumer, MAIN_CHARGER, false);
 		else if (!cti->tcpc_kpoc)
 			charger_manager_force_disable_power_path(
 				cti->chg_consumer, MAIN_CHARGER, true);
+#endif
 		break;
 	default:
 		return -EINVAL;
@@ -307,16 +359,28 @@ static int mt_charger_set_property(struct power_supply *psy,
 
 	dump_charger_name(mtk_chg->chg_type);
 
-	if (!cti->ignore_usb) {
+#ifdef CONFIG_MT6360_PMU_CHARGER
+	is_host = mt6360_get_is_host();
+#endif
+
+	if (!cti->ignore_usb && !is_host) {
 		/* usb */
 		if ((mtk_chg->chg_type == STANDARD_HOST) ||
 			(mtk_chg->chg_type == CHARGING_HOST) ||
 			(mtk_chg->chg_type == NONSTANDARD_CHARGER)) {
-				mt_usb_connect_v1();
+			if (mtk_chg->chg_type != NONSTANDARD_CHARGER) {
+				struct otg_notify *o_notify = get_otg_notify();
+
+				send_otg_notify(o_notify, NOTIFY_EVENT_USB_CABLE, 1);
+			}
+			mt_usb_connect_v1();
 			#ifdef CONFIG_EXTCON_USB_CHG
 			info->vbus_state = 1;
 			#endif
 		} else {
+			struct otg_notify *o_notify = get_otg_notify();
+
+			send_otg_notify(o_notify, NOTIFY_EVENT_USB_CABLE, 0);
 			mt_usb_disconnect_v1();
 			#ifdef CONFIG_EXTCON_USB_CHG
 			info->vbus_state = 0;
@@ -334,8 +398,64 @@ static int mt_charger_set_property(struct power_supply *psy,
 #ifdef CONFIG_MACH_MT6771
 	power_supply_changed(mtk_chg->chg_psy);
 #endif
+
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	if (psp == POWER_SUPPLY_PROP_CHARGE_TYPE) {
+#if IS_ENABLED(CONFIG_VIRTUAL_MUIC)
+		psy = power_supply_get_by_name("bc12");
+#else
+		psy = power_supply_get_by_name("battery");
+#endif
+		if (!psy) {
+			pr_err("%s: Fail to get psy (battery)\n",
+				__func__);
+		} else {
+			switch (mtk_chg->chg_type) {
+			case CHARGING_HOST:
+				cable_type = SEC_BATTERY_CABLE_USB_CDP;
+				break;
+			case NONSTANDARD_CHARGER:
+				cable_type = SEC_BATTERY_CABLE_TIMEOUT;
+				break;
+			case STANDARD_HOST:
+			case APPLE_0_5A_CHARGER:
+				cable_type = SEC_BATTERY_CABLE_USB;
+				break;
+			case STANDARD_CHARGER:
+			case SAMSUNG_CHARGER:
+				cable_type = SEC_BATTERY_CABLE_TA;
+				break;
+			case APPLE_2_4A_CHARGER:
+			case APPLE_2_1A_CHARGER:
+			case APPLE_1_0A_CHARGER:
+				cable_type = SEC_BATTERY_CABLE_TA;
+				break;
+			default:
+				cable_type = SEC_BATTERY_CABLE_NONE;
+			}
+#if defined(CONFIG_PDIC_NOTIFIER)
+			if ((tcpm_inquire_pd_connected(cti->tcpc)) &&
+				(cable_type != SEC_BATTERY_CABLE_NONE)) {
+				pr_info("%s: set SRCCAP\n", __func__);
+				value.intval = 1;
+				psy_do_property("battery", set,
+						POWER_SUPPLY_EXT_PROP_SRCCAP, value);
+			}
+#endif
+			pr_info("%s: battery ONLINE with: %d\n",
+				__func__, cable_type);
+			propval.intval = cable_type;
+			ret = power_supply_set_property(psy,
+				POWER_SUPPLY_PROP_ONLINE, &propval);
+			if (ret < 0)
+				pr_err("%s: psy online fail(%d)\n",
+					__func__, ret);
+		}
+	}
+#else
 	power_supply_changed(mtk_chg->ac_psy);
 	power_supply_changed(mtk_chg->usb_psy);
+#endif
 
 	return 0;
 }
@@ -406,7 +526,9 @@ static enum power_supply_property mt_usb_properties[] = {
 static void tcpc_power_off_work_handler(struct work_struct *work)
 {
 	pr_info("%s\n", __func__);
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 	kernel_power_off();
+#endif
 }
 
 static void charger_in_work_handler(struct work_struct *work)
@@ -418,6 +540,14 @@ static void charger_in_work_handler(struct work_struct *work)
 #ifdef CONFIG_TCPC_CLASS
 static void plug_in_out_handler(struct chg_type_info *cti, bool en, bool ignore)
 {
+#ifdef CONFIG_MTK_TYPEC_WATER_DETECT
+	if (cti->water_detected && cti->tcpc_kpoc) {
+		pr_info("%s: water detected in KPOC, bypass bc1.2\n",
+			__func__);
+		return;
+	}
+#endif
+
 	mutex_lock(&cti->chgdet_lock);
 	if (cti->chgdet_en == en)
 		goto skip;
@@ -437,6 +567,7 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 	struct chg_type_info *cti = container_of(pnb,
 		struct chg_type_info, pd_nb);
 	int vbus = 0;
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 	struct power_supply *ac_psy = power_supply_get_by_name("ac");
 	struct power_supply *usb_psy = power_supply_get_by_name("usb");
 	struct mt_charger *mtk_chg_ac;
@@ -462,6 +593,7 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 		chr_err("%s, fail to get mtk_chg_usb\n", __func__);
 		return NOTIFY_BAD;
 	}
+#endif
 
 	switch (event) {
 	case TCP_NOTIFY_SINK_VBUS:
@@ -482,31 +614,73 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 		    noti->typec_state.old_state == TYPEC_ATTACHED_NORP_SRC ||
 		    noti->typec_state.old_state == TYPEC_ATTACHED_AUDIO)
 			&& noti->typec_state.new_state == TYPEC_UNATTACHED) {
+#if defined(CONFIG_BATTERY_SAMSUNG)
+			pr_info("%s USB Plug out\n", __func__);
+			plug_in_out_handler(cti, false, false);
+#endif
 			if (cti->tcpc_kpoc) {
+#ifdef CONFIG_KPOC_GET_SOURCE_CAP_TRY
+				pr_info("%s error_recovery_once = %d\n", __func__,
+					cti->tcpc->pd_port.error_recovery_once);
+				if (cti->tcpc->pd_port.error_recovery_once == 1) {
+					pr_info("%s KPOC error recovery once\n",
+					__func__);
+					plug_in_out_handler(cti, false, false);
+					break;
+				}
+#endif /*CONFIG_KPOC_GET_SOURCE_CAP_TRY*/
 				vbus = battery_get_vbus();
 				pr_info("%s KPOC Plug out, vbus = %d\n",
 					__func__, vbus);
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 				mtk_chg_ac->chg_type = CHARGER_UNKNOWN;
 				mtk_chg_usb->chg_type = CHARGER_UNKNOWN;
 				power_supply_changed(ac_psy);
 				power_supply_changed(usb_psy);
+#endif
 				queue_work_on(cpumask_first(cpu_online_mask),
 					      cti->pwr_off_wq,
 					      &cti->pwr_off_work);
 				break;
 			}
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 			pr_info("%s USB Plug out\n", __func__);
 			plug_in_out_handler(cti, false, false);
+#endif
 		} else if (noti->typec_state.old_state == TYPEC_ATTACHED_SRC &&
 			noti->typec_state.new_state == TYPEC_ATTACHED_SNK) {
 			pr_info("%s Source_to_Sink\n", __func__);
 			plug_in_out_handler(cti, true, true);
 		}  else if (noti->typec_state.old_state == TYPEC_ATTACHED_SNK &&
 			noti->typec_state.new_state == TYPEC_ATTACHED_SRC) {
+#if defined(CONFIG_BATTERY_SAMSUNG) && defined(CONFIG_PDIC_NOTIFIER)
+			PD_NOTI_TYPEDEF pdic_noti;
+#endif
 			pr_info("%s Sink_to_Source\n", __func__);
+#if defined(CONFIG_BATTERY_SAMSUNG) && defined(CONFIG_PDIC_NOTIFIER)
+			pdic_noti.src = PDIC_NOTIFY_DEV_PDIC;
+			pdic_noti.dest = PDIC_NOTIFY_DEV_BATT;
+			pdic_noti.id = PDIC_NOTIFY_ID_POWER_STATUS;
+			pdic_noti.sub1 = 0;
+			pdic_noti.sub2 = 0;
+			pdic_noti.sub3 = 0;
+			pd_noti.sink_status.current_pdo_num = 0;
+			pd_noti.sink_status.selected_pdo_num = 0;
+			pd_noti.sink_status.available_pdo_num = 0;
+			pd_noti.event = PDIC_NOTIFY_EVENT_PD_PRSWAP_SNKTOSRC;
+			pdic_notifier_notify((PD_NOTI_TYPEDEF *)&pdic_noti, &pd_noti, 0);
+#endif
 			plug_in_out_handler(cti, false, true);
 		}
 		break;
+#ifdef CONFIG_MTK_TYPEC_WATER_DETECT
+	case TCP_NOTIFY_WD_STATUS:
+		if (noti->wd_status.water_detected)
+			cti->water_detected = true;
+		else
+			cti->water_detected = false;
+		break;
+#endif
 	}
 	return NOTIFY_OK;
 }
@@ -611,7 +785,7 @@ static void init_extcon_work(struct work_struct *work)
 #endif
 
 #ifdef CONFIG_MACH_MT6771
-static int mt6370_psy_notifier(struct notifier_block *nb,
+static int mtk_6370_psy_notifier(struct notifier_block *nb,
 				unsigned long event, void *data)
 {
 	struct power_supply *psy = data;
@@ -623,25 +797,18 @@ static int mt6370_psy_notifier(struct notifier_block *nb,
 	union power_supply_propval pval;
 	int ret;
 
-	if (event != PSY_EVENT_PROP_CHANGED) {
-		pr_info("%s, event not equal\n", __func__);
+	cti->chr_psy = power_supply_get_by_name("mt6370_pmu_charger");
+	if (IS_ERR_OR_NULL(cti->chr_psy)) {
+		pr_info("fail to get chr_psy\n");
+		cti->chr_psy = NULL;
 		return NOTIFY_DONE;
 	}
 
-	if (IS_ERR_OR_NULL(cti->chr_psy)) {
-		cti->chr_psy = power_supply_get_by_name("mt6370_pmu_charger");
-		if (IS_ERR_OR_NULL(cti->chr_psy)) {
-			pr_info("fail to get chr_psy\n");
-			cti->chr_psy = NULL;
-			return NOTIFY_DONE;
-		}
-	} else
-		pr_info("%s, get mt6370 psy success, event(%d)\n", __func__, event);
-
 	/*psy is mt6370, type_psy is charger_type psy*/
-	if (psy != cti->chr_psy) {
-		pr_info("power supply not equal\n");
+	if (event != PSY_EVENT_PROP_CHANGED || psy != cti->chr_psy) {
+		pr_info("event or power supply not equal\n");
 		return NOTIFY_DONE;
+
 	}
 
 	type_psy = power_supply_get_by_name("charger");
@@ -733,15 +900,25 @@ static int mt_charger_probe(struct platform_device *pdev)
 	mt_chg->chg_desc.get_property = mt_charger_get_property;
 	mt_chg->chg_cfg.drv_data = mt_chg;
 
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	mt_chg->ac_desc.name = "mtk-ac";
+	mt_chg->ac_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
+#else
 	mt_chg->ac_desc.name = "ac";
 	mt_chg->ac_desc.type = POWER_SUPPLY_TYPE_MAINS;
+#endif
 	mt_chg->ac_desc.properties = mt_ac_properties;
 	mt_chg->ac_desc.num_properties = ARRAY_SIZE(mt_ac_properties);
 	mt_chg->ac_desc.get_property = mt_ac_get_property;
 	mt_chg->ac_cfg.drv_data = mt_chg;
 
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	mt_chg->usb_desc.name = "mtk-usb";
+	mt_chg->usb_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
+#else
 	mt_chg->usb_desc.name = "usb";
 	mt_chg->usb_desc.type = POWER_SUPPLY_TYPE_USB;
+#endif
 	mt_chg->usb_desc.properties = mt_usb_properties;
 	mt_chg->usb_desc.num_properties = ARRAY_SIZE(mt_usb_properties);
 	mt_chg->usb_desc.get_property = mt_usb_get_property;
@@ -802,7 +979,7 @@ static int mt_charger_probe(struct platform_device *pdev)
 				boot_mode = tag->bootmode;
 		}
 	}
-	//ret = get_boot_mode();
+//	ret = get_boot_mode();
 	if (boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT ||
 	    boot_mode == LOW_POWER_OFF_CHARGING_BOOT)
 		cti->tcpc_kpoc = true;
@@ -833,14 +1010,10 @@ static int mt_charger_probe(struct platform_device *pdev)
 	device_init_wakeup(&pdev->dev, true);
 
 #ifdef CONFIG_MACH_MT6771
-	cti->psy_nb.notifier_call = mt6370_psy_notifier;
+	cti->psy_nb.notifier_call = mtk_6370_psy_notifier;
 	ret = power_supply_reg_notifier(&cti->psy_nb);
 	if (ret)
 		pr_info("fail to register notifer\n");
-
-	cti->chr_psy = power_supply_get_by_name("mt6370_pmu_charger");
-	if (IS_ERR_OR_NULL(cti->chr_psy))
-		pr_info("%s, fail to get chr_psy\n", __func__);
 #endif
 
 	#ifdef CONFIG_EXTCON_USB_CHG
@@ -906,8 +1079,10 @@ static int mt_charger_resume(struct device *dev)
 	}
 
 	power_supply_changed(mt_charger->chg_psy);
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 	power_supply_changed(mt_charger->ac_psy);
 	power_supply_changed(mt_charger->usb_psy);
+#endif
 
 	return 0;
 }

@@ -43,6 +43,11 @@ config MMC_BLOCK
 	  mount the filesystem. Almost everyone wishing MMC support
 	  should say Y or M here.
 
+config MMC_SUPPORT_STLOG
+        bool "Enable storage log"
+        depends on MMC && PROC_STLOG
+        default y
+
 config MMC_BLOCK_MINORS
 	int "Number of minors per block device"
 	depends on MMC_BLOCK

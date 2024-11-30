@@ -183,7 +183,9 @@ int set_shutdown_cond(int shutdown_cond)
 		mutex_unlock(&sdc.lock);
 		bm_err("[%s]OVERHEAT shutdown!\n", __func__);
 		mutex_lock(&system_transition_mutex);
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 		kernel_power_off();
+#endif
 		mutex_unlock(&system_transition_mutex);
 		break;
 	case SOC_ZERO_PERCENT:
@@ -303,7 +305,9 @@ static int shutdown_event_handler(struct shutdown_controller *sdd)
 			if (duraction.tv_sec >= SHUTDOWN_TIME) {
 				bm_err("soc zero shutdown\n");
 				mutex_lock(&system_transition_mutex);
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 				kernel_power_off();
+#endif
 				mutex_unlock(&system_transition_mutex);
 				return next_waketime(polling);
 
@@ -327,7 +331,9 @@ static int shutdown_event_handler(struct shutdown_controller *sdd)
 			if (duraction.tv_sec >= SHUTDOWN_TIME) {
 				bm_err("uisoc one percent shutdown\n");
 				mutex_lock(&system_transition_mutex);
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 				kernel_power_off();
+#endif
 				mutex_unlock(&system_transition_mutex);
 				return next_waketime(polling);
 			}
@@ -349,7 +355,9 @@ static int shutdown_event_handler(struct shutdown_controller *sdd)
 		if (duraction.tv_sec >= SHUTDOWN_TIME) {
 			bm_err("dlpt shutdown\n");
 			mutex_lock(&system_transition_mutex);
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 			kernel_power_off();
+#endif
 			mutex_unlock(&system_transition_mutex);
 			return next_waketime(polling);
 		}
@@ -418,7 +426,9 @@ static int shutdown_event_handler(struct shutdown_controller *sdd)
 					bm_err("low bat shutdown, over %d second\n",
 						SHUTDOWN_TIME);
 					mutex_lock(&system_transition_mutex);
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 					kernel_power_off();
+#endif
 					mutex_unlock(&system_transition_mutex);
 					return next_waketime(polling);
 				}
@@ -507,7 +517,9 @@ static int power_misc_routine_thread(void *arg)
 			bm_err("%s battery overheat~ power off\n",
 				__func__);
 			mutex_lock(&system_transition_mutex);
+#if !defined(CONFIG_BATTERY_SAMSUNG)
 			kernel_power_off();
+#endif
 			mutex_unlock(&system_transition_mutex);
 			fix_coverity = 1;
 			return 1;

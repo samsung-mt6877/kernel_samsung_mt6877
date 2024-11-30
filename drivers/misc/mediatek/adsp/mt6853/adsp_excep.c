@@ -22,6 +22,10 @@
 #include "adsp_excep.h"
 #include "adsp_logger.h"
 
+#if IS_ENABLED(CONFIG_SND_SOC_SAMSUNG_AUDIO)
+#include <sound/samsung/sec_audio_sysfs.h>
+#endif
+
 #define ADSP_MISC_EXTRA_SIZE    0x400 //1KB
 #define ADSP_MISC_BUF_SIZE      0x10000 //64KB
 #define ADSP_TEST_EE_PATTERN    "Assert-Test"
@@ -139,9 +143,11 @@ static int dump_buffer(struct adsp_exception_control *ctrl, int coredump_id)
 	n += dump_adsp_shared_memory(buf + n, total - n, coredump_id);
 	n += dump_adsp_shared_memory(buf + n, total - n, ADSP_A_LOGGER_MEM_ID);
 
+	mutex_lock(&ctrl->buffer_lock);
 	reinit_completion(&ctrl->done);
 	ctrl->buf_backup = buf;
 	ctrl->buf_size = total;
+	mutex_unlock(&ctrl->buffer_lock);
 
 	pr_debug("%s, vmalloc size %u, buffer %p, dump_size %u",
 		 __func__, total, buf, n);
@@ -223,6 +229,10 @@ void adsp_aed_worker(struct work_struct *ws)
 						aed_work);
 	struct adsp_priv *pdata = NULL;
 	int cid = 0, ret = 0, retry = 0;
+#if IS_ENABLED(CONFIG_SND_SOC_SAMSUNG_AUDIO)
+	char env[32] = {0,};
+	char *envp[2] = {env, NULL};
+#endif
 
 	/* wake lock AP*/
 #if IS_ENABLED(CONFIG_PM_WAKELOCKS)
@@ -245,6 +255,12 @@ void adsp_aed_worker(struct work_struct *ws)
 
 	/* exception dump */
 	adsp_exception_dump(ctrl);
+
+#if IS_ENABLED(CONFIG_SND_SOC_SAMSUNG_AUDIO)
+	send_adsp_silent_reset_ev();
+	snprintf(env, sizeof(env), "ADSP_LAST_MSG");
+	kobject_uevent_env(&ctrl->wakeup_lock->dev->kobj, KOBJ_CHANGE, envp);
+#endif
 
 	/* reset adsp */
 	adsp_enable_clock();
@@ -310,6 +326,7 @@ int init_adsp_exception_control(struct device *dev,
 	ctrl->buf_backup = NULL;
 	ctrl->buf_size = 0;
 	mutex_init(&ctrl->lock);
+	mutex_init(&ctrl->buffer_lock);
 	init_completion(&ctrl->done);
 	INIT_WORK(&ctrl->aed_work, adsp_aed_worker);
 #if IS_ENABLED(CONFIG_PM_WAKELOCKS)
@@ -442,6 +459,7 @@ static ssize_t adsp_dump_show(struct file *filep, struct kobject *kobj,
 	ssize_t n = 0;
 	struct adsp_exception_control *ctrl = &excep_ctrl;
 
+	mutex_lock(&ctrl->buffer_lock);
 	if (ctrl->buf_backup) {
 		n = copy_from_buffer(buf, -1, ctrl->buf_backup,
 			ctrl->buf_size, offset, size);
@@ -455,6 +473,7 @@ static ssize_t adsp_dump_show(struct file *filep, struct kobject *kobj,
 			complete(&ctrl->done);
 		}
 	}
+	mutex_unlock(&ctrl->buffer_lock);
 
 	return n;
 }

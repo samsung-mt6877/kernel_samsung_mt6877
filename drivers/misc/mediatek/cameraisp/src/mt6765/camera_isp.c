@@ -634,6 +634,10 @@ struct S_START_T {
  */
 static unsigned int g_regScen = 0xa5a5a5a5; /* remove later */
 
+static unsigned int g_virtual_cq_cnt[2] = {0, 0};
+static unsigned int g_virtual_cq_cnt_a;
+static unsigned int g_virtual_cq_cnt_b;
+static  spinlock_t  virtual_cqcnt_lock;
 
 static /*volatile*/ wait_queue_head_t P2WaitQueueHead_WaitDeque;
 static /*volatile*/ wait_queue_head_t P2WaitQueueHead_WaitFrame;
@@ -4955,7 +4959,8 @@ static long ISP_REF_CNT_CTRL_FUNC(unsigned long Param)
 				ref_cnt_ctrl.ctrl, ref_cnt_ctrl.id);
 
 		/*  */
-		if (ref_cnt_ctrl.id < ISP_REF_CNT_ID_MAX) {
+		if (ref_cnt_ctrl.id < ISP_REF_CNT_ID_MAX &&
+		    ref_cnt_ctrl.id >= 0) {
 			/* //////////////////---add lock here */
 			spin_lock(&(IspInfo.SpinLockIspRef));
 			/* ////////////////// */
@@ -6346,17 +6351,19 @@ static signed int ISP_REGISTER_IRQ_USERKEY(char *userName)
 static signed int ISP_MARK_IRQ(struct ISP_WAIT_IRQ_STRUCT *irqinfo)
 {
 	unsigned long flags;
-	int idx = my_get_pow_idx(irqinfo->EventInfo.Status);
+	unsigned int idx = my_get_pow_idx(irqinfo->EventInfo.Status);
 
 	unsigned long long  sec = 0;
 	unsigned long       usec = 0;
 
-	if (irqinfo->Type >= ISP_IRQ_TYPE_AMOUNT) {
+	if (irqinfo->Type >= ISP_IRQ_TYPE_AMOUNT ||
+	    irqinfo->Type < 0) {
 		pr_err("MARK_IRQ: type error(%d)", irqinfo->Type);
 		return -EFAULT;
 	}
 
-	if (irqinfo->EventInfo.St_type >= ISP_IRQ_ST_AMOUNT) {
+	if (irqinfo->EventInfo.St_type >= ISP_IRQ_ST_AMOUNT ||
+	    irqinfo->EventInfo.St_type < 0) {
 		pr_err("MARK_IRQ: st_type error(%d)",
 			irqinfo->EventInfo.St_type);
 		return -EFAULT;
@@ -6366,11 +6373,6 @@ static signed int ISP_MARK_IRQ(struct ISP_WAIT_IRQ_STRUCT *irqinfo)
 	    irqinfo->EventInfo.UserKey < 0) {
 		pr_err("MARK_IRQ: userkey error(%d)",
 			irqinfo->EventInfo.UserKey);
-		return -EFAULT;
-	}
-
-	if ((idx < 0) || (idx >= 32)) {
-		pr_info("[Error] %s : Invalid idx = %d",  __func__, idx);
 		return -EFAULT;
 	}
 
@@ -6617,7 +6619,7 @@ static signed int ISP_WaitIrq(struct ISP_WAIT_IRQ_STRUCT *WaitIrq)
 	signed int Ret = 0, Timeout = WaitIrq->EventInfo.Timeout;
 	unsigned long flags;
 	unsigned int irqStatus;
-	int idx;
+	unsigned int idx;
 	bool freeze_passbysigcnt = false;
 
 	if ((WaitIrq->Type >= ISP_IRQ_TYPE_AMOUNT) ||
@@ -6924,11 +6926,6 @@ EXIT:
 				      [WaitIrq->EventInfo.St_type]
 				      [WaitIrq->EventInfo.UserKey]) {
 		idx = my_get_pow_idx(WaitIrq->EventInfo.Status);
-		if ((idx < 0) || (idx >= 32)) {
-			pr_info("[Error] : Invalid idx = %d", idx);
-			Ret = -EFAULT;
-			return Ret;
-		}
 		IspInfo.IrqInfo.MarkedFlag[WaitIrq->Type]
 					  [WaitIrq->EventInfo.St_type]
 					  [WaitIrq->EventInfo.UserKey] &=
@@ -7096,7 +7093,9 @@ static long ISP_ioctl(struct file *pFile, unsigned int Cmd, unsigned long Param)
 	struct ISP_P2_BUFQUE_STRUCT    p2QueBuf;
 	unsigned int                 regScenInfo_value = 0xa5a5a5a5;
 	/*    signed int                  burstQNum;*/
+#ifdef WAKELOCK_CTRL
 	unsigned int                 wakelock_ctrl;
+#endif
 	unsigned int                 module;
 	unsigned long flags;
 	int userKey =  -1;
@@ -7121,6 +7120,7 @@ static long ISP_ioctl(struct file *pFile, unsigned int Cmd, unsigned long Param)
 	/*  */
 	switch (Cmd) {
 	case ISP_WAKELOCK_CTRL:
+#ifdef WAKELOCK_CTRL
 		if (copy_from_user(&wakelock_ctrl, (void *)Param,
 		    sizeof(unsigned int)) != 0) {
 			pr_err("get ISP_WAKELOCK_CTRL from user fail\n");
@@ -7160,6 +7160,7 @@ static long ISP_ioctl(struct file *pFile, unsigned int Cmd, unsigned long Param)
 			}
 		}
 		break;
+#endif
 	case ISP_GET_DROP_FRAME:
 		if (copy_from_user(&DebugFlag[0], (void *)Param,
 		    sizeof(unsigned int)) != 0) {
@@ -8799,6 +8800,25 @@ static long ISP_ioctl(struct file *pFile, unsigned int Cmd, unsigned long Param)
 			}
 		}
 		break;
+	case ISP_SET_VIR_CQCNT:
+		spin_lock((spinlock_t *)(&virtual_cqcnt_lock));
+		if (copy_from_user(&g_virtual_cq_cnt, (void *)Param,
+			sizeof(unsigned int)*2) == 0) {
+			pr_info("From hw_module:%d Virtual CQ count from user land : %d\n",
+			g_virtual_cq_cnt[0], g_virtual_cq_cnt[1]);
+		} else {
+			pr_info(
+				"Virtual CQ count copy_from_user failed\n");
+			Ret = -EFAULT;
+		}
+
+		if (g_virtual_cq_cnt[0] == 0)
+			g_virtual_cq_cnt_a = g_virtual_cq_cnt[1];
+		else if (g_virtual_cq_cnt[0] == 1)
+			g_virtual_cq_cnt_b = g_virtual_cq_cnt[1];
+
+		spin_unlock((spinlock_t *)(&virtual_cqcnt_lock));
+		break;
 	default:
 	{
 		pr_err("Unknown Cmd(%d)\n", Cmd);
@@ -9285,6 +9305,7 @@ static long ISP_ioctl_compat(struct file *filp, unsigned int cmd,
 	case ISP_SET_PM_QOS_INFO:
 	case ISP_SET_PM_QOS:
 	case ISP_SET_SEC_DAPC_REG:
+	case ISP_SET_VIR_CQCNT:
 		return filp->f_op->unlocked_ioctl(filp, cmd, arg);
 	default:
 		return -ENOIOCTLCMD;
@@ -9340,6 +9361,12 @@ static signed int ISP_open(
 	} else {
 		IspInfo.UserCount++;
 		spin_unlock(&(IspInfo.SpinLockIspRef));
+
+#ifdef CONFIG_PM_SLEEP
+		__pm_stay_awake(isp_wake_lock);
+#else
+		wake_lock(&isp_wake_lock);
+#endif
 
 		/* kernel log limit to (current+150) lines per second */
 	#if (_K_LOG_ADJUST == 1)
@@ -9734,6 +9761,7 @@ static signed int ISP_release(
 	 * The driver must releae the wakelock, ozws the system will not enter
 	 */
 	/* the power-saving mode */
+#ifdef WAKELOCK_CTRL
 	if (g_WaitLockCt) {
 		pr_info("wakelock disable!! cnt(%d)\n", g_WaitLockCt);
 #ifdef CONFIG_PM_SLEEP
@@ -9743,6 +9771,7 @@ static signed int ISP_release(
 #endif
 		g_WaitLockCt = 0;
 	}
+#endif
 	/* reset */
 	/*      */
 	for (i = 0; i < IRQ_USER_NUM_MAX; i++) {
@@ -9868,6 +9897,12 @@ static signed int ISP_release(
 		ISP_EnableClock(MFALSE);
 		i--;
 	}
+
+#ifdef CONFIG_PM_SLEEP
+	__pm_relax(isp_wake_lock);
+#else
+	wake_unlock(&isp_wake_lock);
+#endif
 
 EXIT:
 	mutex_unlock(&gDipMutex);
@@ -10208,6 +10243,7 @@ static signed int ISP_probe(struct platform_device *pDev)
 		spin_lock_init(&(SpinLock_P2FrameList));
 		spin_lock_init(&(SpinLockRegScen));
 		spin_lock_init(&(SpinLock_UserKey));
+		spin_lock_init(&(virtual_cqcnt_lock));
 		#ifdef ENABLE_KEEP_ION_HANDLE
 		for (i = 0; i < ISP_DEV_NODE_NUM; i++) {
 			if (gION_TBL[i].node != ISP_DEV_NODE_NUM) {
@@ -14717,9 +14753,21 @@ LB_CAMA_SOF_IGNORE:
 	spin_unlock(&(IspInfo.SpinLockIrq[module]));
 	/*  */
 	if (IrqStatus & SOF_INT_ST) {
-		wake_up_interruptible(&IspInfo.WaitQHeadCam
+		if ((ISP_RD32(CAM_REG_CTL_SPARE2(reg_module))%0x100) !=
+			g_virtual_cq_cnt_a) {
+			IRQ_LOG_KEEPER(module, m_CurrentPPB, _LOG_INF,
+			"CAMA PHY cqcnt:%d != VIR cqcnt:%d\n",
+			(ISP_RD32(CAM_REG_CTL_SPARE2(reg_module))%0x100),
+			g_virtual_cq_cnt_a);
+		} else {
+			IRQ_LOG_KEEPER(module, m_CurrentPPB, _LOG_INF,
+			"CAMA PHY cqcnt:%d VIR cqcnt:%d\n",
+			(ISP_RD32(CAM_REG_CTL_SPARE2(reg_module))%0x100),
+			g_virtual_cq_cnt_a);
+			wake_up_interruptible(&IspInfo.WaitQHeadCam
 			[ISP_GetWaitQCamIndex(module)]
 			[ISP_WAITQ_HEAD_IRQ_SOF]);
+		}
 	}
 	if (IrqStatus & SW_PASS1_DON_ST) {
 		wake_up_interruptible(&IspInfo.WaitQHeadCam
@@ -15341,9 +15389,21 @@ LB_CAMB_SOF_IGNORE:
 	spin_unlock(&(IspInfo.SpinLockIrq[module]));
 	/*  */
 	if (IrqStatus & SOF_INT_ST) {
-		wake_up_interruptible(&IspInfo.WaitQHeadCam
+		if ((ISP_RD32(CAM_REG_CTL_SPARE2(reg_module))%0x100) !=
+			g_virtual_cq_cnt_b) {
+			IRQ_LOG_KEEPER(module, m_CurrentPPB, _LOG_INF,
+			"CAMB PHY cqcnt:%d != VIR cqcnt:%d\n",
+			(ISP_RD32(CAM_REG_CTL_SPARE2(reg_module))%0x100),
+			g_virtual_cq_cnt_b);
+		} else {
+			IRQ_LOG_KEEPER(module, m_CurrentPPB, _LOG_INF,
+			"CAMB PHY cqcnt:%d VIR cqcnt:%d\n",
+			(ISP_RD32(CAM_REG_CTL_SPARE2(reg_module))%0x100),
+			g_virtual_cq_cnt_b);
+			wake_up_interruptible(&IspInfo.WaitQHeadCam
 			[ISP_GetWaitQCamIndex(module)]
 			[ISP_WAITQ_HEAD_IRQ_SOF]);
+		}
 	}
 	if (IrqStatus & SW_PASS1_DON_ST) {
 		wake_up_interruptible(&IspInfo.WaitQHeadCam

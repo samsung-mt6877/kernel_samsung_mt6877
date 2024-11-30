@@ -171,6 +171,30 @@ void kpd_double_key_enable(int en)
 		writew((u16) (tmp & ~KPD_DOUBLE_KEY_MASK), KP_SEL);
 }
 
+#if defined(PMIC_KEY_STATUS)
+unsigned int kpd_pmic_pwrkey_status_hal(void)
+{
+	unsigned int pressed;
+
+	pressed = mt6358_upmu_get_pwrkey_deb();
+	pressed = !pressed;
+	kpd_print("[%s] %s power key\n", __func__, pressed ? "pressed" : "released");
+
+	return pressed;
+}
+
+unsigned int kpd_pmic_homekey_status_hal(void)
+{
+	unsigned int pressed;
+
+	pressed = mt6358_upmu_get_homekey_deb();
+	pressed = !pressed;
+	kpd_print("[%s] %s home key\n", __func__, pressed ? "pressed" : "released");
+
+	return pressed;
+}
+#endif
+
 /********************************************************************/
 void kpd_pmic_rstkey_hal(unsigned long pressed)
 {

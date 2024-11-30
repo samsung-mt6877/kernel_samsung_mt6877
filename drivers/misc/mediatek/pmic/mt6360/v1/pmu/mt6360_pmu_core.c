@@ -12,6 +12,16 @@
 #include "../inc/mt6360_pmu.h"
 #include "../inc/mt6360_pmu_core.h"
 
+#if defined(CONFIG_BATTERY_SAMSUNG)
+#include <../drivers/battery/common/sec_charging_common.h>
+#if defined(CONFIG_BATTERY_GKI)
+static char __read_mostly *f_mode;
+module_param(f_mode, charp, 0444);
+#else
+extern int f_mode_battery;
+#endif
+#endif
+
 struct mt6360_pmu_core_info {
 	struct device *dev;
 	struct mt6360_pmu_info *mpi;
@@ -256,6 +266,31 @@ static int mt6360_pmu_core_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "no platform data specified\n");
 		return -EINVAL;
 	}
+
+#if defined(CONFIG_SEC_FACTORY)
+#if defined(CONFIG_BATTERY_GKI)
+	if (!f_mode)
+		pdata->f_mode = NO_MODE;
+	else if ((strncmp(f_mode, "OB", 2) == 0) || (strncmp(f_mode, "DL", 2) == 0))
+		pdata->f_mode = OB_MODE;
+	else if (strncmp(f_mode, "IB", 2) == 0)
+		pdata->f_mode = IB_MODE;
+	else
+		pdata->f_mode = NO_MODE;
+
+	pr_info("[BAT] %s: f_mode: %s\n", __func__, BOOT_MODE_STRING[pdata->f_mode]);
+#endif
+	/* Disable MRSTB reset */
+#if defined(CONFIG_BATTERY_GKI)
+	if (pdata->f_mode == OB_MODE) {
+#else
+	if (f_mode_battery == OB_MODE) {
+#endif
+		pr_info("%s Disable MREN in OB mode\n", __func__);
+		pdata->mren = 0;
+	}
+#endif
+
 	mpci = devm_kzalloc(&pdev->dev, sizeof(*mpci), GFP_KERNEL);
 	if (!mpci)
 		return -ENOMEM;

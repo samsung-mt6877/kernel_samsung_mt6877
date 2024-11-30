@@ -22,6 +22,9 @@
 #include <linux/pm_wakeup.h>
 #include <linux/version.h>
 #include <linux/clk.h>
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+#include <linux/workqueue.h>
+#endif
 #if defined(CONFIG_MTK_CHARGER)
 extern enum charger_type mt_get_charger_type(void);
 #endif
@@ -163,6 +166,16 @@ enum musb_g_ep0_state {
 	MUSB_EP0_STAGE_STATUSOUT,	/* (after IN data) */
 	MUSB_EP0_STAGE_ACKWAIT,	/* after zlp, before statusin */
 } __packed;
+
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+/* to check usb connection for Android auto */
+enum {
+	RELEASE	= 0,
+	NOTIFY	= 1,
+};
+
+#define ERR_RESET_CNT	3
+#endif
 
 /*
  * OTG protocol constants.  See USB OTG 1.3 spec,
@@ -327,6 +340,10 @@ struct musb {
 	irqreturn_t (*isr)(int irq, void *private_data);
 	struct work_struct irq_work;
 	struct work_struct otg_notifier_work;
+#if defined(CONFIG_BATTERY_SAMSUNG)
+	struct work_struct set_vbus_current_work;
+	int usb_state;
+#endif
 	u16 hwvers;
 	struct delayed_work id_pin_work;
 #ifdef CONFIG_MTK_MUSB_CARPLAY_SUPPORT
@@ -477,6 +494,7 @@ struct musb {
 #endif
 	bool power;
 	unsigned is_ready:1;
+	bool usb_bootcomplete:1;
 	bool usb_if;
 	u16 fifo_addr;
 #if defined(CONFIG_USBIF_COMPLIANCE)
@@ -486,7 +504,9 @@ struct musb {
 	struct workqueue_struct *st_wq;
 	struct power_supply *usb_psy;
 	struct notifier_block psy_nb;
-
+#if defined(CONFIG_CABLE_TYPE_NOTIFIER)
+	int sec_cable_type;
+#endif
 #if defined(CONFIG_USB_ROLE_SWITCH)
 	struct otg_switch_mtk *otg_sx;
 #endif
@@ -495,6 +515,18 @@ struct musb {
 	/* host suspend */
 	bool host_suspend;
 	bool usb_connected;
+
+	struct work_struct dp_work;
+
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+	/* to check usb connection for Android auto */
+	struct delayed_work usb_event_work;
+	ktime_t rst_time_before;
+	ktime_t rst_time_first;
+	int rst_err_cnt;
+	bool rst_err_noti;
+	bool event_state;
+#endif
 };
 
 static inline struct musb *gadget_to_musb(struct usb_gadget *g)
@@ -557,6 +589,9 @@ extern irqreturn_t musb_interrupt(struct musb *musb);
 extern irqreturn_t dma_controller_irq(int irq, void *private_data);
 
 extern void musb_hnp_stop(struct musb *musb);
+#if defined(CONFIG_CABLE_TYPE_NOTIFIER)
+extern bool musb_is_host(void);
+#endif
 
 static inline void musb_platform_set_vbus(struct musb *musb, int is_on)
 {

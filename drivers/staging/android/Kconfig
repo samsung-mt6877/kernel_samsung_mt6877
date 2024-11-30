@@ -25,6 +25,18 @@ config DEBUG_KINFO
 	   - UTS_RELEASE
 	   - BUILD_INFO(ro.build.fingerprint)
 
+config SAMSUNG_LMKD_DEBUG
+	bool "record lmkd kill history"
+	default y
+	help
+	  record lmkd kill history
+
+config SAMSUNG_FREECESS
+	bool "thraw frozen process when recv sig"
+	default n
+	help
+	  thraw frozen process when recv sig.
+
 config ANDROID_VSOC
 	tristate "Android Virtual SoC support"
 	default n
@@ -170,6 +182,15 @@ config ION_OF
 	  extensions
 
 	  If using Ion and devicetree, you should say Y here
+
+config ION_RBIN_HEAP
+	bool "ION RBIN Heap"
+	default y
+	depends on ION && RBIN && CLEANCACHE
+	help
+	  Provides ION RBIN heap which utilizes RBIN memory.
+	  While RBIN heap is similar with CMA heap, it assumes that an ION buffer
+	  can be composed of multiple free chunks.
 
 endif # if ANDROID
 
