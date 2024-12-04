@@ -263,7 +263,7 @@ void update_curr_sensor_pos(int sensorId) {
 	current_sensor_pos = remapped_device_id;
 }
 
-void update_mipi_sensor_err_cnt()
+void update_mipi_sensor_err_cnt(void)
 {
 	struct cam_hw_param *ec_param = NULL;
 

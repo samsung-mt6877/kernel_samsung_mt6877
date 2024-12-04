@@ -1991,7 +1991,7 @@ bool s5k4hayx_select_otp_page(unsigned int page)
 	return complete;
 }
 
-void s5k4hayx_otp_off_setting()
+void s5k4hayx_otp_off_setting(void)
 {
 	write_cmos_sensor_8(0x0A00, 0x04);
 	write_cmos_sensor_8(0x0A00, 0x00);
