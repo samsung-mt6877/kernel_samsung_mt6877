@@ -2020,6 +2020,7 @@ static void mmc_blk_read_single(struct mmc_queue *mq, struct request *req)
 			mmc_blk_rw_rq_prep(mqrq, card, 1, mq);
 
 			mmc_wait_for_req(host, mrq);
+
 			err = mmc_send_status(card, &status);
 			if (err)
 				goto error_exit;
